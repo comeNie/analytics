@@ -1,0 +1,50 @@
+package com.orienttech.statics.dao;
+
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.PagingAndSortingRepository;
+
+import com.orienttech.statics.dao.entity.Role;
+
+import java.lang.Integer;
+
+public interface RoleMngDao extends PagingAndSortingRepository<Role, Integer>,
+		JpaSpecificationExecutor<Role> {
+	
+	@Query("select r.name from Role r where r.id=?1")
+	public String getNameById(Integer id);
+	
+	@Query("select max(r.id) from Role r")
+	public Integer getMaxId();
+	
+	@Query("select count(*) from Role r where r.name =?1")
+	public int  getCountByName(String name);
+	
+	@Query("select new Role(r.id,r.name,r.status,r.ifTodoList) from Role r where r.id=?1")
+	public Role getRoleById(Integer id);
+	
+	@Modifying
+	@Query("update Role r set r.name=?1 , r.status=?2 where r.id=?3")
+	public void modifyRole(String name,String status,Integer id);
+	
+	@Modifying
+	@Query(value=("delete ROLE_PRIV where ROLE_ID =?1"),nativeQuery=true)
+	public void deleteFunction(Integer roleId);
+	
+	@Modifying
+	@Query(value=("insert into ROLE_PRIV(ROLE_ID,FUNCTION_ID) values(?1,?2)"),nativeQuery=true)
+	public void saveFunction(Integer roleId,Integer functionId);
+	
+	@Modifying
+	@Query(value=("delete TBL_COGNOS_DASHBOARD_SHOW where ROLE_ID =?1"),nativeQuery=true)
+	public void deleteDashboardFunction(String roleId);
+	
+	@Modifying
+	@Query(value=("insert into TBL_COGNOS_DASHBOARD_SHOW(ROLE_ID,PICTURE_ID) values(?1,?2)"),nativeQuery=true)
+	public void saveDashboardFunction(String roleId,String functionId);
+	
+	@Query(value="select r.role_id from role r where r.name=?1",nativeQuery=true)
+	public String findRoleByName(String name);
+	
+}

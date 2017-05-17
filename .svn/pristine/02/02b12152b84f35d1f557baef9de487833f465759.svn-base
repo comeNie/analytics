@@ -1,0 +1,17 @@
+package com.orienttech.statics.service.model.workflow;
+
+import java.io.IOException;
+
+
+public class Test {
+	
+	public static void main(String[] args) throws IOException{
+			
+		System.out.println(5 & 9);
+		
+		System.out.println('6'>10);
+	}
+}
+
+
+

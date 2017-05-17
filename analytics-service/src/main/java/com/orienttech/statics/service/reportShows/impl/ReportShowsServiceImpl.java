@@ -1,0 +1,103 @@
+package com.orienttech.statics.service.reportShows.impl;
+
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+import org.hibernate.validator.constraints.NotBlank;
+import org.hibernate.validator.constraints.NotEmpty;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.google.common.collect.Lists;
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.dao.reportShows.FavoriteDao;
+import com.orienttech.statics.dao.reportShows.ReportShowsDao;
+import com.orienttech.statics.service.reportShows.ReportShowsService;
+
+@Service
+public class ReportShowsServiceImpl implements ReportShowsService {
+	
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	
+	@Autowired
+	private ReportShowsDao reportShowsDao;
+	
+	@Autowired
+	private FavoriteDao favoriteDao;
+
+	@Transactional(readOnly = true)
+	@Override
+	public String findReportShowsByFunctionId(int functionId) {
+		return reportShowsDao.findReportShowsByFunctionId(functionId);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Page<Object[]> findIndexByFunctionId(int pageNumber, int pageSize,
+			int functionId) {
+		List<Object> params=Lists.newArrayList();
+		String str = "select i.index_name,i.index_meaning, r.id,r.row_number from tbl_index i, index_function_relation r where i.index_id=r.index_id and r.function_id="+functionId
+				+" order by r.row_number";
+		return dynamicQuery.nativeQuery(new PageRequest(pageNumber, pageSize), str,params.toArray());
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Page<Object[]> findIndexForReport(int pageNumber, int pageSize,
+			int functionId, String indexCode, String indexName) {
+		List<Object> params=Lists.newArrayList();
+		StringBuffer sb = new StringBuffer();
+		int index =1;
+		sb.append("select i.index_id,i.index_code,i.index_name,i.index_meaning from tbl_index i where i.index_id not in (select if.index_id from index_function_relation if where if.function_id="+functionId+")");
+		if(StringUtils.isNotBlank(indexCode)){
+			sb.append(" and i.index_code like ?").append(index++);
+			params.add("%"+indexCode+"%");
+		}
+		if(StringUtils.isNotBlank(indexName)){
+			sb.append(" and i.index_name like ?").append(index++);
+			params.add("%"+indexName+"%");
+		}
+		sb.append(" order by i.index_id desc");
+		return dynamicQuery.nativeQuery(new PageRequest(pageNumber, pageSize), sb.toString(),params.toArray());
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public void deleteIndexFunctionById(int id) {
+		reportShowsDao.deleteIndexFunctionById(id);
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public void updatePirvFunction(String indexShows, int functionId) {
+		reportShowsDao.updatePirvFunction(indexShows, functionId);
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public int cancelStore(int functionId) {
+		return favoriteDao.cancelStore(functionId);
+	}
+	/**
+	 * 获取指标信息
+	 */
+	@Override
+	public List<Object[]> findReportByFunctionId(int functionId) {
+		List<Object> params=Lists.newArrayList();
+		String str = "select i.index_name,i.index_meaning, r.id from tbl_index i, index_function_relation r where i.index_id=r.index_id and r.function_id="+functionId
+				+" order by i.index_id desc";
+		return dynamicQuery.nativeQuery(str,params.toArray());
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public void execute(int rowNumber, int id) {
+		reportShowsDao.execute(rowNumber, id);
+		
+	}
+
+}

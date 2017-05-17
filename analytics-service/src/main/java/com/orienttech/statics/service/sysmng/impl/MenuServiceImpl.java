@@ -1,0 +1,452 @@
+package com.orienttech.statics.service.sysmng.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
+import com.google.common.base.Function;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.dao.reportShows.FavoriteDao;
+import com.orienttech.statics.service.model.sysmng.MenuBo;
+import com.orienttech.statics.service.sysmng.MenuService;
+@Service
+public class MenuServiceImpl implements MenuService {
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	
+	@Autowired
+	private FavoriteDao favoriteDao;
+	
+	@Override
+	public List<MenuBo> findMenuListByRoleId(String roleId) {
+		return this.buildMenuTree(roleId);
+	}
+	/**
+	 * @param roleId
+	 * @return
+	 */
+	@Deprecated
+	private List<MenuBo> findFirstMenuList(Long roleId){
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select function_id, name");
+		strBuffer.append("  from priv_function_t");
+		strBuffer.append(" where function_id in");
+		strBuffer.append("  (select distinct super_id from priv_function_t where function_id in (");
+		strBuffer.append(" select distinct super_id from priv_function_t a, role_priv b");
+		strBuffer.append("  where a.function_id = b.function_id and a.levels = 3 and role_id = ?1)");
+		strBuffer.append(" ) order by function_id");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString(),roleId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[0]));
+				bo.setName(CommonHelper.toStr(objs[1]));
+				return bo;
+			}
+		});
+	}
+	@Deprecated
+	private List<MenuBo> findSecondMenuList(Long roleId,Long parentId){
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append(" select function_id, name, levels");
+		strBuffer.append(" from priv_function_t where function_id in ");
+		strBuffer.append(" (select distinct super_id from priv_function_t a, role_priv b");
+		strBuffer.append(" where a.function_id = b.function_id and a.levels = 3 and role_id = ?1)");
+		strBuffer.append(" and super_id = ?2 order by function_id");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString(),roleId,parentId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		List<MenuBo> menus=Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[0]));
+				bo.setName(CommonHelper.toStr(objs[1]));
+				bo.setLevel(CommonHelper.toInt(objs[2]));
+				return bo;
+			}
+		});
+		return menus;
+	}
+	@Deprecated
+	private List<MenuBo> findThirdMenuList(Long roleId,Long parentId){
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select a.function_id,a.name,a.url urlname,a.action_type,a.action ");
+		strBuffer.append(" from priv_function_t a , role_priv b");
+		strBuffer.append(" where  a.function_id = b.function_id and a.levels=3");
+		strBuffer.append("  and role_id=?1 and super_id=?2");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString(),roleId,parentId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				int i=0;
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[i++]));
+				bo.setName(CommonHelper.toStr(objs[i++]));
+				bo.setUrl(CommonHelper.toStr(objs[i++]));
+				bo.setActionType(CommonHelper.toStr(objs[i++]));
+				bo.setAction(CommonHelper.toStr(objs[i++]));
+				bo.setLevel(3);
+				return bo;
+			}
+		});
+	}
+	/**
+	 * 根据角色id构建菜单树，用于登录
+	 * @param roleId
+	 * @return
+	 */
+	private List<MenuBo> buildMenuTree(String roleId){
+		Map<Long, MenuBo> allMap=this.findAllMenus();
+		List<Long> menuIds=this.findThirdMenuIds(roleId);
+		List<MenuBo> list=Lists.newArrayList();
+		Map<Long, MenuBo> map=Maps.newHashMap();
+		MenuBo firstMenu=null;//一级菜单
+		MenuBo secondMenu=null;//二级菜单
+		MenuBo thirdMenu=null;//三级菜单
+		if(menuIds != null && menuIds.size() > 0){
+			for (Long id : menuIds) {
+				thirdMenu=allMap.get(id);
+				secondMenu=allMap.get(thirdMenu.getPid());
+				firstMenu=allMap.get(secondMenu.getPid());
+				if(!map.containsKey(firstMenu.getId())){
+					firstMenu=copyMenu(firstMenu);
+					map.put(firstMenu.getId(), firstMenu);
+					list.add(firstMenu);
+				}else{
+					firstMenu=map.get(firstMenu.getId());
+				}
+				if(!map.containsKey(secondMenu.getId())){
+					secondMenu=copyMenu(secondMenu);
+					map.put(secondMenu.getId(), secondMenu);
+					firstMenu.getChildren().add(secondMenu);
+				}else{
+					secondMenu=map.get(secondMenu.getId());
+				}
+				secondMenu.getChildren().add(thirdMenu);
+			}
+		}
+		
+		return list;
+	}
+	/**
+	 * 生成新对象
+	 * @param menu
+	 * @return
+	 */
+	private MenuBo copyMenu(MenuBo menu){
+		MenuBo newMenu=new MenuBo();
+		BeanUtils.copyProperties(menu, newMenu, "children");
+		return newMenu;
+	}
+	/**
+	 * 查询全部菜单
+	 * @return
+	 */
+	private Map<Long, MenuBo> findAllMenus(){
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select a.function_id,a.super_id,a.name,a.url urlname,a.action_type,a.action ");
+		strBuffer.append(" from priv_function_t a");
+		strBuffer.append(" order by a.function_id");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString());
+		
+		Map<Long, MenuBo> map=Maps.newHashMap();
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		MenuBo bo=null;;
+		for (Object[] objs : list) {
+			int i=0;
+			bo=new MenuBo();
+			bo.setId(CommonHelper.toLong(objs[i++]));
+			bo.setPid(CommonHelper.toLong(objs[i++]));
+			bo.setName(CommonHelper.toStr(objs[i++]));
+			bo.setUrl(CommonHelper.toStr(objs[i++]));
+			bo.setActionType(CommonHelper.toStr(objs[i++]));
+			bo.setAction(CommonHelper.toStr(objs[i++]));
+			bo.setLevel(3);
+			map.put(bo.getId(), bo);
+		}
+		return map;
+	}
+	
+	/**
+	 * 根据角色查找菜单ids
+	 * @param roleId
+	 * @return
+	 */
+	private List<Long> findThirdMenuIds(String roleId){
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select distinct rp.function_id from role_priv rp");
+		strBuffer.append(" left join priv_function_t pft on pft.function_id=rp.function_id");
+		strBuffer.append(" left join ROLE r on r.role_id=rp.role_id ");
+		strBuffer.append(" where rp.role_id in (?1) and pft.levels=3 and r.role_status='1' order by rp.function_id");
+		List<Long> llist = new ArrayList<Long>();
+		String [] role =roleId.split(",");
+		for(String str :role){
+			llist.add(Long.parseLong(str));
+		}
+		List<Object> list =dynamicQuery.nativeQuery(Object.class, strBuffer.toString(), llist);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object, Long>() {
+			@Override
+			public Long apply(Object obj) {
+				return CommonHelper.toLong(obj);
+			}
+		});
+	}
+	/**
+	 * 加入多维分析和明细查询URL
+	 * @modify by wangxy 
+	 * @date 20150714
+	 * TODO
+	 */
+	@Override
+	public MenuBo findMenu(Long id) {
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select a.function_id,a.super_id,a.name,a.url urlname,a.action_type,a.action,a.analysis_url,a.query_url ");
+		strBuffer.append(" from priv_function_t a where a.function_id=?1");
+		strBuffer.append(" order by a.function_id");
+		Object[] objs =dynamicQuery.nativeQuerySingleResult(Object[].class,strBuffer.toString(),id);
+		if(objs==null||objs.length==0){
+			return null;
+		}
+		int i=0;
+		MenuBo bo=new MenuBo();
+		bo.setId(CommonHelper.toLong(objs[i++]));
+		bo.setPid(CommonHelper.toLong(objs[i++]));
+		bo.setName(CommonHelper.toStr(objs[i++]));
+		bo.setUrl(this.handleQuotesOfUrl(CommonHelper.toStr(objs[i++])));
+		bo.setActionType(CommonHelper.toStr(objs[i++]));
+		bo.setAction(CommonHelper.toStr(objs[i++]));
+		bo.setAnalysisUrl(this.handleQuotesOfUrl(CommonHelper.toStr(objs[i++])));
+		bo.setQueryUrl(this.handleQuotesOfUrl(CommonHelper.toStr(objs[i++])));
+		bo.setLevel(3);
+		return bo;
+	}
+	private String handleQuotesOfUrl(String url){
+		if(StringUtils.isBlank(url)){
+			return StringUtils.EMPTY;
+		}
+		return url.replaceAll("\"", "'");
+	}
+	
+	
+	@Override
+	public List<MenuBo> findAllFunctionId(Long roleId) {
+		
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select function_id,name from priv_function_t ");
+		strBuffer.append("where function_id in(select function_id from role_priv where role_id=?1)");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString(),roleId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[0]));
+				bo.setName(CommonHelper.toStr(objs[1]));
+				return bo;
+			}
+		});
+	}
+	
+	@Override
+	public List<MenuBo> findAllDashboardId(String roleId) {
+		
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append(" select distinct(PICTURE_ID),ROLE_ID from TBL_COGNOS_DASHBOARD_SHOW where role_id=?1");
+		List<Object[]> list = dynamicQuery.nativeQuery(strBuffer.toString(),roleId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[0]));
+				bo.setName(CommonHelper.toStr(objs[1]));
+				return bo;
+			}
+		});
+	}
+	
+	@Override
+	public List<MenuBo> findMenuTreeList() {
+		String str="select a.function_id,a.super_id,a.name from priv_function_t a where to_char(a.function_id) not like '200%00%' order by a.super_id,a.function_id";
+		List<Object[]> list =dynamicQuery.nativeQuery(str);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		Map<Long, List<MenuBo>> listMap=Maps.newHashMap();//父Id有关的节点
+		Map<Long,MenuBo> map=Maps.newHashMap();//id有关的节点
+		Long pid=null;
+		List<MenuBo> temp_list=null;
+		MenuBo menu=null;
+		for (Object[] objs : list) {
+			pid=CommonHelper.toLong(objs[1]);
+			menu=new MenuBo(CommonHelper.toLong(objs[0]), pid, CommonHelper.toStr(objs[2]));
+			if(listMap.containsKey(pid)){
+				listMap.get(pid).add(menu);
+			}else{
+				temp_list=Lists.newArrayList();
+				temp_list.add(menu);
+				listMap.put(pid, temp_list);
+			}
+			map.put(menu.getId(), menu);
+			if(map.containsKey(pid)){
+				map.get(pid).getChildren().add(menu);
+			}
+		}
+		return listMap.get(0L);
+	}
+	
+	/**
+	 * TODO
+	 * 报表说明维护页加载报表列表
+	 * @modified by wangxy 20151104
+	 */
+	@Override
+	public List<MenuBo> findReportMenuTreeList() {
+		String str="select a.function_id,a.super_id,a.name"
+				+ " from priv_function_t a"
+				+ " where to_char(a.function_id) not like '200%00%'"
+				+ " and (a.action = 'DoCognosBWXDAction' or a.action = 'Cognos110Action'"
+				+ " or a.action ='tenDaysReport' or a.action='riskMonthReport' or a.action ='monthlyBusiNotification' or a.action='monthlyLoanBusiNotification' or a.action='brCreateReoprt')"
+				+ " and a.name!='逾期分析'"
+				+ " order by a.super_id,a.function_id";
+		List<Object[]> list =dynamicQuery.nativeQuery(str);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		Map<Long, List<MenuBo>> listMap=Maps.newHashMap();//父Id有关的节点
+		Map<Long,MenuBo> map=Maps.newHashMap();//id有关的节点
+		Long pid=null;
+		List<MenuBo> temp_list=null;
+		MenuBo menu=null;
+		for (Object[] objs : list) {
+			pid=CommonHelper.toLong(objs[1]);
+			menu=new MenuBo(CommonHelper.toLong(objs[0]), pid, CommonHelper.toStr(objs[2]));
+			if(listMap.containsKey(pid)){
+				listMap.get(pid).add(menu);
+			}else{
+				temp_list=Lists.newArrayList();
+				temp_list.add(menu);
+				listMap.put(pid, temp_list);
+			}
+			map.put(menu.getId(), menu);
+			if(map.containsKey(pid)){
+				map.get(pid).getChildren().add(menu);
+			}
+		}
+		return listMap.get(0L);
+	}
+	
+	
+	@Override
+	public List<MenuBo> findAllDshaboardFunctionId(String roleId){
+		
+		StringBuffer strBuffer=new StringBuffer();
+		strBuffer.append("select ROLE_ID,PICTURE_ID from TBL_COGNOS_DASHBOARD_SHOW ");
+		strBuffer.append("where ROLE_ID in("+ roleId + ")");
+		List<Object[]> list =dynamicQuery.nativeQuery(strBuffer.toString(),roleId);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		return Lists.transform(list, new Function<Object[], MenuBo>() {
+			@Override
+			public MenuBo apply(Object[] objs) {
+				MenuBo bo=new MenuBo();
+				bo.setId(CommonHelper.toLong(objs[0]));
+				bo.setName(CommonHelper.toStr(objs[1]));
+				return bo;
+			}
+		});
+		
+	}
+	
+	
+	
+	
+	@Override
+	public List<MenuBo> findDashboardMenuTreeList() {
+		String str="select a.function_id,a.super_id,a.name from priv_function_t a where to_char(a.function_id) like '200%00%' order by a.super_id,a.function_id";
+		List<Object[]> list =dynamicQuery.nativeQuery(str);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		Map<Long, List<MenuBo>> listMap=Maps.newHashMap();//父Id有关的节点
+		Map<Long,MenuBo> map=Maps.newHashMap();//id有关的节点
+		Long pid=null;
+		List<MenuBo> temp_list=null;
+		MenuBo menu=null;
+		for (Object[] objs : list) {
+			pid=CommonHelper.toLong(objs[1]);
+			menu=new MenuBo(CommonHelper.toLong(objs[0]), pid, CommonHelper.toStr(objs[2]));
+			if(listMap.containsKey(pid)){
+				listMap.get(pid).add(menu);
+			}else{
+				temp_list=Lists.newArrayList();
+				temp_list.add(menu);
+				listMap.put(pid, temp_list);
+			}
+			map.put(menu.getId(), menu);
+			if(map.containsKey(pid)){
+				map.get(pid).getChildren().add(menu);
+			}
+		}
+		return listMap.get(0L);
+	}
+	
+	private List<MenuBo> buildMenuTree(Long pid,List<Object[]> list){
+		Object[] objs=null;
+		MenuBo new_bo=null;
+		List<MenuBo> menus=Lists.newArrayList();
+		Long temp_pid=null;
+		for (int i = 0,len=list.size(); i < len; i++) {
+			objs=list.get(i);
+			temp_pid=CommonHelper.toLong(objs[1]);
+			if(temp_pid==pid){
+				new_bo=new MenuBo(CommonHelper.toLong(objs[0]), CommonHelper.toLong(objs[1]), CommonHelper.toStr(objs[2]));
+				new_bo.setChildren(buildMenuTree(new_bo.getId(), list));
+				menus.add(new_bo);
+			}
+		}
+		return menus;
+	}
+	@Override
+	public List<MenuBo> findStoreByUserId(int userId) {
+		List<Object[]> olist = favoriteDao.findStoreByUserId(userId);
+		List<MenuBo> mlist = new ArrayList<MenuBo>();
+		for(Object [] obj : olist){
+			MenuBo menuBo = new MenuBo();
+			menuBo.setActionType(String.valueOf(obj[0]));
+			menuBo.setId(Long.parseLong(String.valueOf(obj[1])));
+			menuBo.setName(String.valueOf(obj[2]));
+			mlist.add(menuBo);
+		}
+		return mlist;
+	}
+}

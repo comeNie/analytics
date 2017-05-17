@@ -1,0 +1,83 @@
+package com.orienttech.statics.web.controller.monitorMng;
+
+import java.io.File;
+import java.io.IOException;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.entity.EastlendingMonitor;
+import com.orienttech.statics.service.monitorMng.MonitorMngService;
+
+@RequestMapping("/monitorMng")
+@Controller
+public class MonitorMngController extends BaseController {
+	
+	@Autowired
+	MonitorMngService monitorMngService;
+	
+	@RequestMapping
+	public String index(){
+		
+		return "/monitorMng/monitorMng";
+	}
+	
+	@RequestMapping("/findAll")
+	@ResponseBody
+	public DataTablesPage findAll(@RequestParam("start") Integer pageNumber,@RequestParam("search[value]") String search,
+			@RequestParam("length") Integer pageSize, Integer sEcho){
+		
+		Page<Object[]> page = monitorMngService.findAll(pageNumber/pageSize + 1,pageSize,search);
+		
+		return new DataTablesPage(sEcho, page);
+	}
+	
+	@RequestMapping("/doAdd")
+	@ResponseBody
+	public String doAdd(@RequestParam(value = "uploadFile", required = false) MultipartFile myfile,EastlendingMonitor em){
+		
+		String msg = monitorMngService.add(myfile, em);
+		
+		return msg;
+	}
+	
+	@RequestMapping("/download")
+	public void download(String link,HttpServletRequest req, HttpServletResponse resp){
+		
+		String filePath = PropertiesConstants.getString(PropertiesConstants.USER_HOME) 
+				+ PropertiesConstants.getString(PropertiesConstants.DATA_MONITOR_MNG) 
+				+ File.separator +link;
+		
+		try {
+			FileUtils.downloadFile(new File(filePath), link, req, resp);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+	}
+	
+	@RequestMapping("/deleteById")
+	@ResponseBody
+	public Result deleteById(Integer id){
+		
+		monitorMngService.delete(id);
+		
+		return success();
+	}
+	
+	
+	
+}

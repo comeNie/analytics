@@ -1,0 +1,118 @@
+package com.orienttech.statics.dao.entity;
+
+import static com.orienttech.statics.commons.utils.Contants.TJ_SCHEMA;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.orienttech.statics.commons.entity.BaseEntity;
+
+@Entity
+@Table(name = "ROLE", schema = TJ_SCHEMA)
+public class Role extends BaseEntity {
+	private static final long serialVersionUID = -8375544680063344333L;
+
+	@Id
+	@Column(name = "role_id", nullable = false)
+	private Integer id;// 角色id
+	@Column(name = "name", length = 200)
+	private String name;// 角色名称
+	@Column(name = "role_status")
+	private String status;// 角色状态
+	@Column(name = "org_property")
+	private String orgProperty;// 机构财产
+	@Column(name = "super_id")
+	private String parentId;// 父id
+	@Column(name = "organ_code", length = 10)
+	private String organCode;// 机构代码
+	@Column(name = "if_todo_list", length = 10)
+	private String ifTodoList;//是否显示待办列表
+
+	public Role() {
+		super();
+	}
+	/**
+	 * 用于前台显示角色列表
+	 * @param id
+	 * @param name
+	 * @param status
+	 */
+	public Role(Integer id, String name, String status) {
+		super();
+		this.id = id;
+		this.name = name;
+		this.status = status;
+	}
+	/**
+	 * 用于控制是否显示"工作面板"
+	 * @param id
+	 * @param name
+	 * @param status
+	 * @param ifTodoList
+	 * @author wangxy 20150803
+	 */
+	public Role(Integer id, String name, String status, String ifTodoList) {
+		super();
+		this.id = id;
+		this.name = name;
+		this.status = status;
+		this.ifTodoList = ifTodoList;
+	}
+
+	public Integer getId() {
+		return id;
+	}
+
+	public void setId(Integer id) {
+		this.id = id;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	public String getOrgProperty() {
+		return orgProperty;
+	}
+
+	public void setOrgProperty(String orgProperty) {
+		this.orgProperty = orgProperty;
+	}
+
+	public String getParentId() {
+		return parentId;
+	}
+
+	public void setParentId(String parentId) {
+		this.parentId = parentId;
+	}
+
+	public String getOrganCode() {
+		return organCode;
+	}
+
+	public void setOrganCode(String organCode) {
+		this.organCode = organCode;
+	}
+	public String getIfTodoList() {
+		return ifTodoList;
+	}
+	public void setIfTodoList(String ifTodoList) {
+		this.ifTodoList = ifTodoList;
+	}
+
+}

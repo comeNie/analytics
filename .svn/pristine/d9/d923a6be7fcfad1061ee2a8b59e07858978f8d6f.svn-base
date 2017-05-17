@@ -1,0 +1,264 @@
+package com.orienttech.statics.web.controller.todoList;
+
+
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.shiro.SecurityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.service.model.workflow.*;
+import com.orienttech.statics.service.workflow.WorkFlowService;
+
+@Controller
+@RequestMapping("/" + "todoList")
+public class TodoListController extends BaseController{
+	
+	private Log log=LogFactory.getLog(TodoListController.class);
+	
+//	@Autowired private DashboardService dashboardService;
+	@Autowired private WorkFlowService workFlowService;
+	
+//	@RequestMapping("/"+SYS_ENTRANCE)
+//	public String findUserTenantSys(Model model){
+//		ShiroUser shiroUser = (ShiroUser) SecurityUtils.getSubject().getPrincipal();
+//		List<TenantSystem> list = dashboardService.getUserSys(shiroUser.getTenantId(), shiroUser.getId());
+//		model.addAttribute("tenantSystems", list);
+//		return SYS_ENTRANCE;
+//	}
+//	
+//	@RequestMapping
+//	public String main(Model model){
+//		// 1. 看这个工号有没有小贷、微贷或风险的权限
+//		ShiroUser shiroUser = (ShiroUser) SecurityUtils.getSubject().getPrincipal();
+//		List<EcOrgPerson> listAccount = shiroUser.getPersons();
+//		if (StringUtils.isEmpty(shiroUser.getLogname()) && (shiroUser.getLogOrgid() == null || shiroUser.getLogOrgid() == 0)) {
+//			List<TenantSystem> list = dashboardService.getUserSys(shiroUser.getTenantId(), shiroUser.getId());
+//			// 2. 如果有查出来，放List里
+//			for(TenantSystem ts : list) {
+//				if ((ts.getId() == 1 || ts.getId() == 2 || ts.getId() == 3) && "1".equals(ts.getFlag())) {
+//					listAccount = dashboardService.readAccount(shiroUser.getLoginName());
+//					// 3. 把List放到shiroUser
+//					shiroUser.setPersons(listAccount);
+//					break;
+//				}
+//			}
+//		}
+//		return DASHBOARD;
+//	}
+//	
+//	@RequestMapping(value = "/getPersons", method = RequestMethod.POST)
+//	@ResponseBody
+//	public Result getPersons(String logname,Integer orgid) {
+//		ShiroUser curUser = (ShiroUser)SecurityUtils.getSubject().getPrincipal();
+//		return success(curUser.getPersons());
+//	}
+//	
+//	/**
+//	 * 验证是否是一个 账号并且 是一个 机构
+//	 * @return
+//	 */
+//	@RequestMapping(value = "/isMultiple", method = RequestMethod.POST)
+//	@ResponseBody
+//	public Result isMultiple() {
+//		ShiroUser curUser = (ShiroUser)SecurityUtils.getSubject().getPrincipal();
+//		List<EcOrgPerson> list = curUser.getPersons();
+//		if (list == null || list.size() == 0) {
+//			return failure(curUser);
+//		}
+//		if (list.size() == 1) {
+//			EcOrgPerson eop = list.get(0);
+//			List<EcOrgDepartment> orgList = eop.getOrgList();
+//			if (orgList != null && orgList.size() == 1) {
+//				EcOrgDepartment eod = orgList.get(0);
+//				logger.info(eod.getId() + "/" + eop.getLogname());
+//				return success(curUser.getPersons());
+//			}
+//		}
+//		return failure();
+//	}
+//	/**
+//	 * 记录账号到门户的ShiroUser中
+//	 * @param logname
+//	 * @param orgid
+//	 * @return
+//	 */
+//	@RequestMapping(value = "/registration", method = RequestMethod.POST)
+//	@ResponseBody
+//	public Result registration(String logname, Integer orgid) {
+//		ShiroUser curUser = (ShiroUser)SecurityUtils.getSubject().getPrincipal();
+//		curUser.setLogOrgid(orgid);
+//		curUser.setLogname(logname);
+//		logger.info(orgid + "/" + logname);
+//		return success(curUser);
+//	}
+//	
+//	
+//	@RequestMapping(value = "/isRegist", method = RequestMethod.POST)
+//	@ResponseBody
+//	public Result isRegist() {
+//		ShiroUser curUser = (ShiroUser)SecurityUtils.getSubject().getPrincipal();
+//		List<Integer> sysId = curUser.getSysId();
+//		for (int i = 0; i < sysId.size(); i++) {
+//			if (sysId.get(i) == 1 || sysId.get(i) == 2 || sysId.get(i) == 3) {//有风险微贷小贷的权限
+//				if (curUser.getPersons() == null || curUser.getPersons().size() == 0) {//没有账号,按照只有工号处理
+//					if (StringUtils.isEmpty(curUser.getLoginName())) {
+//						return success();
+//					}
+//				} else {
+//					if (StringUtils.isEmpty(curUser.getLogname()) && (curUser.getLogOrgid() == null || curUser.getLogOrgid() == 0)) {//多账号未登录
+//						return success();
+//					}
+//				}
+//			} else {//按照只有工号处理
+//				if (StringUtils.isEmpty(curUser.getLoginName())) {
+//					return success();
+//				}
+//			}
+//		}
+//		return failure();
+//	}
+//	
+//	@RequestMapping(value = "/verifyPermission/{permissionAccount}/{loginType}", method = RequestMethod.POST)
+//	@ResponseBody
+//	public Result verifyPermission(String logname, @PathVariable String permissionAccount, @PathVariable String loginType) {
+//		ShiroUser curUser = (ShiroUser)SecurityUtils.getSubject().getPrincipal();
+//		if ("signal".equals(loginType)) {
+//			return success();
+//		} else {
+//			String curLogname = curUser.getLogname();
+//			if (StringUtils.isNoneEmpty(curLogname) && curLogname.equals(permissionAccount)) {
+//				return success(curUser.getLogOrgid());
+//			}
+//		}
+//		return failure();
+//	}
+//	
+//	
+//	
+	/*
+	 * 待办总数
+	 */
+	@RequestMapping("/findTodoListToltalNum")
+	@ResponseBody
+	public String findTodoListToltalNum(){
+		
+		SessionUser shiroUser = (SessionUser) SecurityUtils.getSubject()
+				.getPrincipal();
+		String curUser = "";
+		if (shiroUser != null) {
+			curUser = shiroUser.getLoginName();
+			if (StringUtils.isNotEmpty(shiroUser.getLoginName())) {
+				curUser += "," + shiroUser.getLoginName();
+			}
+		}
+		TypedResult<PageTypedResultData<TodoTask>> todoTask = workFlowService
+				.queryPortalToDoListByCondition(curUser,"4", "", "", "", "", "",
+						0 / 10 + 1, 10);
+		//System.out.println("--------------findTodoListToltalNum---------------:"+todoTask.getData().getTotalElements()+"##");
+		return todoTask.getData().getTotalElements()+"";
+	}
+	
+	
+	
+	/**
+	 * 查询待办列表(新)
+	 * @author Wangxy
+	 */
+	@RequestMapping("/findTodoListByCondition")
+	@ResponseBody
+	public DataTablesPage findTodoListByCondition(
+			String taskSubject,
+			String taskCreateDateStart,
+			String taskCreateDateEnd,
+			String taskCreatorName,
+			String workflowCode,
+			@RequestParam("search[value]") String search, 
+			@RequestParam("draw") Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize){
+		
+		DataTablesPage dt = new DataTablesPage();
+		try {
+			SessionUser shiroUser = (SessionUser)SecurityUtils.getSubject().getPrincipal();
+			String curUser = "";
+			if(shiroUser != null){
+				curUser = shiroUser.getLoginName();
+				if (StringUtils.isNotEmpty(shiroUser.getLoginName())) {
+					curUser += "," + shiroUser.getLoginName();
+				}
+			}
+			TypedResult<PageTypedResultData<TodoTask>> todoTask =  workFlowService.queryPortalToDoListByCondition(curUser,"4",workflowCode, taskCreatorName, taskSubject, taskCreateDateStart, taskCreateDateEnd, firstIndex / pageSize + 1, pageSize);
+			if(todoTask.getSuccess()){
+				dt.setData(todoTask.getData().getContent());
+				dt.setRecordsTotal(todoTask.getData().getTotalElements());
+				dt.setRecordsFiltered(todoTask.getData().getTotalElements());
+				dt.setDraw(draw);
+			}else{
+				log.error("查询待办列表出错>>>>" + todoTask.getMsg());
+			}
+				
+		}catch(Exception e){
+			log.error("查询待办列表出错>>>>" + e.getStackTrace());
+		}
+		return dt;
+	}
+	
+	/**
+	 * 查询已办列表(新)
+	 * @author Wangxy
+	 */
+	@RequestMapping("/findDoneListByCondition")
+	@ResponseBody
+	public DataTablesPage findDoneListByCondition(
+			String taskSubject,
+			String taskAssignDateStart,
+			String taskAssignDateEnd,
+			String taskCreatorName,
+			String workflowCode,
+			String taskConfirmDateStart,
+			String taskConfirmDateEnd,
+			@RequestParam(value = "search[value]", required = false) String search,
+			@RequestParam("draw") Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize) {
+		
+		DataTablesPage dt = new DataTablesPage();
+		try {
+			SessionUser shiroUser = (SessionUser)SecurityUtils.getSubject().getPrincipal();
+			String curUser = "";
+			if(shiroUser != null){
+				curUser = shiroUser.getLoginName();
+				if (StringUtils.isNotEmpty(shiroUser.getLoginName())) {
+					curUser += "," + shiroUser.getLoginName();
+				}
+			}
+			TypedResult<PageTypedResultData<DoneTask>> doneTask =  workFlowService.queryPortalDoneListByCondition(curUser, "4", workflowCode, taskCreatorName, taskSubject, taskConfirmDateStart, taskConfirmDateEnd, taskAssignDateStart, taskAssignDateEnd, firstIndex / pageSize + 1, pageSize);
+			if(doneTask.getSuccess()){
+				dt.setData(doneTask.getData().getContent());
+				dt.setRecordsTotal(doneTask.getData().getTotalElements());
+				dt.setRecordsFiltered(doneTask.getData().getTotalElements());
+				dt.setDraw(draw);
+			}else{
+				log.error("查询已办列表出错>>>>" + doneTask.getMsg());
+			}
+				
+		}catch(Exception e) {
+			log.error("查询已办列表出错>>>>" + e.getStackTrace());
+		}
+		return dt;
+	}
+	
+}

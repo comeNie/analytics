@@ -1,0 +1,42 @@
+define(function(require, exports, module) {
+	var rm = {
+		rules:{
+			reportName:{
+				required: true
+			},
+			belongsOrgId:{
+				required: true
+			},
+			busiDate:{
+				required:true
+			},
+			uploadFile:{
+				required: true,
+				extension:"pdf"
+			},
+			description:{
+				required: true
+			}
+		},
+		messages:{
+			reportName:{
+				required: "报表类别不能为空！"
+			},
+			belongsOrgId:{
+				required: "查阅机构不能为空！"
+			},
+			busiDate:{
+				required: "请选择业务时间！"
+			},
+			description:{
+				required: "摘要不能为空！"
+			},
+			uploadFile:{
+				required: "请上传文件",
+				extension:"只允许上传后缀名为.pdf的文件！"
+			}
+			
+		}
+	};
+	module.exports = rm;
+});

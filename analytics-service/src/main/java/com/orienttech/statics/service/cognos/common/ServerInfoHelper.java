@@ -1,0 +1,150 @@
+package com.orienttech.statics.service.cognos.common;
+
+import java.io.File;
+import java.io.IOException;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+
+/**
+ * cognos服务器信息<br/>
+ * 读取配置文件替换默认值
+ *
+ */
+public class ServerInfoHelper {
+	private static ServerInfoHelper instance=new ServerInfoHelper();
+	private static ServerInfo serverInfo=null;
+	private static String historyReportPath="";
+	private static String tempReport="";
+	private static String tempImage="";
+	private static String dataSubmit="";
+	static{
+		serverInfo=instance.new ServerInfo();
+		serverInfo.init();
+		String temp = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.HISTORY_REPORT_PATH);
+		if(StringUtils.isNoneBlank(temp)){
+			historyReportPath=temp;
+		}
+		forceMkdir(historyReportPath);
+		temp = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.TEMP_REPORT_PATH);
+		if(StringUtils.isNoneBlank(temp)){
+			tempReport=temp;
+		}
+		forceMkdir(tempReport);
+		
+		temp = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.TEMP_IMG_PATH);
+		if(StringUtils.isNoneBlank(temp)){
+			tempImage=temp;
+		}
+		forceMkdir(tempImage);
+		
+		temp = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT);
+		if(StringUtils.isNoneBlank(temp)){
+			dataSubmit=temp;
+		}
+		forceMkdir(dataSubmit);
+	}
+	private ServerInfoHelper() {
+		super();
+	}
+	public static ServerInfo getServerInfo(){
+		return serverInfo;
+	}
+	public static String getReportPath(){
+		return historyReportPath;
+	}
+	public static String getTempReportPath(){
+		return tempReport;
+	}
+	public static String getTempImagePath(){
+		return tempImage;
+	}
+	public static String getDataSubmit(){
+		return dataSubmit;
+	}
+	public static void forceMkdir(String path){
+		if(StringUtils.isBlank(path)){
+			return;
+		}
+		File dir=new File(path);
+		if(!FileUtils.isExists(dir)){
+			try {
+				FileUtils.forceMkdir(dir);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+	/**
+	 *
+	 */
+	public class ServerInfo{
+//		private String serverHost = "23.4.160.32";
+//		private String serverPort = "9300";
+//		private String userName = "admin";
+//		private String userPassword = "admin1234!";
+//		private String userNamespace = "unirpt";
+		private String serverHost = PropertiesConstants.getString(PropertiesConstants.COGNOS_SERVICE_HOST);
+		private String serverPort = PropertiesConstants.getString(PropertiesConstants.COGNOS_SERVER_PORT);
+		private String userName = PropertiesConstants.getString(PropertiesConstants.COGNOS_USER_NAME);
+		private String userPassword = PropertiesConstants.getString(PropertiesConstants.COGNOS_USER_PASSWORD);
+		private String userNamespace = PropertiesConstants.getString(PropertiesConstants.COGNOS_USER_NAMESPACE);
+		
+		
+		public ServerInfo() {
+			super();
+		}
+		public void init(){
+			String temp=PropertiesConstants.getString("cognos.serverHost");
+			if(StringUtils.isNoneBlank(temp)){
+				this.serverHost=temp;
+			}
+			temp=PropertiesConstants.getString("cognos.serverPort");
+			if(StringUtils.isNoneBlank(temp)){
+				this.serverPort=temp;
+			}
+			temp=PropertiesConstants.getString("cognos.userName");
+			if(StringUtils.isNoneBlank(temp)){
+				this.userName=temp;
+			}
+			temp=PropertiesConstants.getString("cognos.userPassword");
+			if(StringUtils.isNoneBlank(temp)){
+				this.userPassword=temp;
+			}
+			temp=PropertiesConstants.getString("cognos.userNamespace");
+			if(StringUtils.isNoneBlank(temp)){
+				this.userNamespace=temp;
+			}
+		}
+		public String getServerHost() {
+			return serverHost;
+		}
+		public String getServerPort() {
+			return serverPort;
+		}
+		public String getUserName() {
+			return userName;
+		}
+		public String getUserPassword() {
+			return userPassword;
+		}
+		public String getUserNamespace() {
+			return userNamespace;
+		}
+		public String getServerUrl(){
+			return "http://" + serverHost + ":" + serverPort
+					+ "/p2pd/servlet/dispatch";
+		}
+		@Override
+		public String toString() {
+			return ToStringBuilder.reflectionToString(this, ToStringStyle.MULTI_LINE_STYLE);
+		}
+	}
+	public static void main(String[] args) {
+		System.out.println(getReportPath());
+	}
+}

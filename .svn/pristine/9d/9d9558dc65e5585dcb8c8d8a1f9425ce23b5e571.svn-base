@@ -1,0 +1,950 @@
+package com.orienttech.statics.service.templateMng.impl;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
+import net.sf.json.JSONObject;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.SecurityUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.commons.utils.CalendarUtils;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.commons.utils.Contants;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.RoleMngDao;
+import com.orienttech.statics.dao.UserSsoDao;
+import com.orienttech.statics.dao.entity.submission.TblReportTemplate;
+import com.orienttech.statics.dao.entity.submission.TblTemplateSum;
+import com.orienttech.statics.dao.fixednum.StaDimOrgDao;
+import com.orienttech.statics.dao.submission.TblReportTemplateDao;
+import com.orienttech.statics.dao.submission.TblTemplateSubmitDao;
+import com.orienttech.statics.dao.submission.TblTemplateSumDao;
+import com.orienttech.statics.service.dateSummarize.DateSummarizeService;
+import com.orienttech.statics.service.model.submission.TaskReceiverBo;
+import com.orienttech.statics.service.model.workflow.TaskAction;
+import com.orienttech.statics.service.model.workflow.TypedResult;
+import com.orienttech.statics.service.model.workflow.WorkFlowId;
+import com.orienttech.statics.service.model.workflow.WorkFlowTaskIds;
+import com.orienttech.statics.service.templateMng.TemplateMngService;
+import com.orienttech.statics.service.timedtask.Task;
+import com.orienttech.statics.service.workflow.WorkFlowService;
+import com.orienttech.statics.service.workflow.WorkFlowService.ActionCode;
+import com.orienttech.statics.service.workflow.WorkFlowService.RoleCode;
+import com.orienttech.statics.service.workflow.WorkFlowService.SysCode;
+import com.orienttech.statics.service.workflow.WorkFlowService.WorkFlowCode;
+import com.orienttech.statics.service.workflow.WorkFlowService.WorkFlowNode;
+
+@Service
+public class TemplateMngServiceImpl implements TemplateMngService {
+	private static final Logger logger = LoggerFactory
+			.getLogger(TemplateMngServiceImpl.class); 
+
+	@Autowired
+	private TblReportTemplateDao tblReportTemplateDao;
+	@Autowired
+	private WorkFlowService workFlowService;
+	@Autowired
+	private UserSsoDao userSsoDao;
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private StaDimOrgDao staDimOrgDao;
+	@Autowired
+	private RoleMngDao roleMngDao;
+	@Autowired
+	private Task task;
+	@Autowired
+	private TblTemplateSumDao tblTemplateSumDao;
+	@Autowired
+	private TblTemplateSubmitDao tblTemplateSubmitDao;
+	@Autowired
+	private DateSummarizeService dateSummarizeService;
+
+	/**
+	 * 新增模板
+	 */
+	@Transactional
+	@Override
+	public void add(TblReportTemplate tblReportTemplate, MultipartFile myfile,String sOs) {
+		Date nowDate = new Date();
+		// 状态为新增时，赋值为未提交状态
+		if (null == tblReportTemplate.getState()
+				|| "".equals(tblReportTemplate)) {
+			tblReportTemplate.setState(Contants.STATE_UNCOMMITTED);
+		}
+		
+		// logger.info("tblReportTemplate.getId():"+tblReportTemplate.getId());
+		if (myfile != null && !myfile.isEmpty()) {
+			// String finalPath =
+			// ServerInfoHelper.getDataSubmit()+nowDate.getTime()+".xlsx";
+			// 服务器路径
+			String serverPath = System.getProperty("user.home")
+					+ PropertiesConstants
+							.getString(PropertiesConstants.DATA_SUBMIT)
+					+ File.separator + CalendarUtils.getDateContents();
+			// 最终上传的文件命名以当前时间毫秒数为命名规则
+			String fileName = nowDate.getTime() + ".xlsx";
+			String finalPath = serverPath + fileName;
+			tblReportTemplate.setPath(CalendarUtils.getDateContents()
+					+ fileName);
+			logger.info("finalPath:" + finalPath);
+			// File file = new File(path);
+			try {
+				// 判断文件目录是否存在
+				File director = new File(serverPath);
+				if (!FileUtils.isExists(director)) {
+					director.mkdirs();// 如果不存在，则新建文件目录
+				}
+				FileOutputStream fos = new FileOutputStream(finalPath);
+				// FileUtils.outputFile(file, fos);//上传模板文件
+				FileUtils.outputFile(myfile.getBytes(), fos);// 上传模板文件
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new RuntimeException("保存文件错误，请联系系统管理员！");
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new RuntimeException("保存文件错误，请联系系统管理员！");
+			}
+		}
+		// 修改
+		if (null != tblReportTemplate.getId()
+				&& !"".equals(tblReportTemplate.getId())) {
+			
+			if("save".equals(sOs)){
+				tblReportTemplate.setState(Contants.STATE_SENDBACK_UNCOMMITTED);
+			}
+			else if("submit".equals(sOs)){
+				tblReportTemplate.setState(Contants.STATE_DEP_CHECK);
+			}
+			
+			TblReportTemplate tLast = tblReportTemplateDao
+					.findOne(tblReportTemplate.getId());
+			// logger.info("tLast:"+tLast.getName());
+			String[] ignoreProperties = new String[] {};
+			if (myfile != null && !myfile.isEmpty()) {
+				if("save".equals(sOs)||"submit".equals(sOs)){
+					ignoreProperties = new String[] { "createTime", "createPeople"};
+				}else if("send".equals(sOs)){
+					ignoreProperties = new String[] { "createTime", "createPeople"};
+				}
+				else{
+				ignoreProperties = new String[] { "createTime", "createPeople","state"};
+				}
+			} else {
+				//ignoreProperties = new String[] { "createTime", "createPeople","path","state"};
+				ignoreProperties = new String[] { "createTime", "createPeople","path"};//by dz
+			}
+			BeanUtils
+					.copyProperties(tblReportTemplate, tLast, ignoreProperties);
+			tblReportTemplateDao.save(tLast);
+		} else {
+			// 创建日期
+			tblReportTemplate.setCreateTime(nowDate);
+			tblReportTemplateDao.save(tblReportTemplate);
+		}
+		
+	}
+
+	/**
+	 * 验证模板名称是否存在
+	 * 
+	 * @param name
+	 *            模板名称
+	 */
+	@Transactional(readOnly = true)
+	@Override
+	public boolean getCountByName(String name, String id) {
+		boolean f = false;
+		if (null != id && !"".equals(id)) {// 修改状态。
+			f = tblReportTemplateDao.getCountByName(name) <= 1;
+		} else {
+			f = tblReportTemplateDao.getCountByName(name) <= 0;
+		}
+		return f;
+	}
+
+	/**
+	 * 验证模板编号是否存在
+	 * 
+	 * @param name
+	 *            模板名称
+	 */
+	@Transactional(readOnly = true)
+	@Override
+	public boolean getCountByNo(String no, String id) {
+		boolean f = false;
+		int count = tblReportTemplateDao.getCountByNo(no);
+		// logger.info("count========"+count);
+		if (null != id && !"".equals(id)) {// 修改状态。
+			f = count <= 1;
+		} else {
+			f = count <= 0;
+		}
+		return f;
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public TblReportTemplate getTemplateByWorkflowId(String workflowId) {
+		return tblReportTemplateDao.findReportTemplateByWorkflow(workflowId);
+	}
+
+	/**
+	 * 发送审核
+	 */
+	@SuppressWarnings("unused")
+	@Transactional
+	@Override
+	public void sendAudit(TblReportTemplate tblReportTemplate,
+			SessionUser sessionUser, MultipartFile bs,String receivers) {
+
+		//TODO 任务主题
+		String taskSubject = "模版编号: " + tblReportTemplate.getNo();
+		WorkFlowCode workFlowCode = WorkFlowCode.TemplateWorkflow;
+		WorkFlowNode workFlowNode = WorkFlowNode.TJ_TemplateBuild;
+		
+		//启动流程
+		WorkFlowTaskIds workFlowTaskIds = this.startWorkflow(tblReportTemplate,
+				sessionUser, workFlowCode, workFlowNode, taskSubject);
+
+		//开始处理任务
+		WorkFlowId workFlowId = this.startProcessingTask(tblReportTemplate,
+				sessionUser, workFlowTaskIds);
+		ActionCode actionCode = ActionCode.COMMIT;// 提交
+
+		//接收人
+		String roleId = RoleCode.TJ_OrgCheck.getId();
+		//String taskReceiver = getTaskReceiver(roleId);
+		String taskReceiver = receivers;
+
+		// logger.info("taskReceiver=========="+taskReceiver);
+		String comments = "";// 审核意见
+		// 执行任务
+		WorkFlowTaskIds workFlowTaskIdsLast = executeTask(tblReportTemplate,
+				sessionUser, workFlowCode, workFlowNode, workFlowTaskIds,
+				workFlowId, actionCode, taskReceiver, comments, taskSubject);
+
+		// 获取本环节的操作功能信息
+		List<TaskAction> taskActionList = getTaskActions(workFlowNode);
+
+		tblReportTemplate.setWorkflowId(workFlowTaskIdsLast.getWorkflowId());
+		// 更改状态
+		tblReportTemplate.setState(Contants.STATE_DEP_CHECK);
+		this.add(tblReportTemplate, bs,"send");
+	}
+
+	/**
+	 * 获取接收人
+	 * 
+	 * @param roleId
+	 * @return
+	 */
+	@Override
+	public String getTaskReceiver(String roleId) {
+		String nativeSql = "select t.sso_id,t.user_name from tb_user_sso t where t.role_id like '%,"
+				+ roleId
+				+ ",%' "
+				+ "union select t.sso_id,t.user_name from tb_user_sso t where t.role_id like '"
+				+ roleId
+				+ ",%' "
+				+ "union select t.sso_id,t.user_name from tb_user_sso t where t.role_id like '%,"
+				+ roleId
+				+ "' "
+				+ "union select t.sso_id,t.user_name from tb_user_sso t where t.role_id = '"
+				+ roleId + "' ";
+		List<Object[]> loginNames = dynamicQuery.nativeQuery(nativeSql,
+				new ArrayList<Object>().toArray());
+		String taskReceiver = "";
+		for (Object[] objArray : loginNames) {
+			if (objArray != null && objArray.length > 0) {
+				if (taskReceiver.equals("")) {
+					taskReceiver += (String) objArray[0];
+				} else {
+					taskReceiver += "," + (String) objArray[0];
+				}
+			}
+		}
+		return taskReceiver;
+	}
+
+	/**
+	 * 启动流程方法
+	 * 
+	 * @param tblReportTemplate
+	 * @param sessionUser
+	 * @param workFlowCode
+	 * @param workFlowNode
+	 * @param taskSubject
+	 * @return
+	 */
+	public WorkFlowTaskIds startWorkflow(TblReportTemplate tblReportTemplate,
+			SessionUser sessionUser, WorkFlowCode workFlowCode,
+			WorkFlowNode workFlowNode, String taskSubject) {
+		TypedResult<WorkFlowTaskIds> workFlowTaskIdsResult = workFlowService
+				.startWorkflow(SysCode.TJ_SYS, workFlowCode, workFlowNode,
+						sessionUser.getLoginName(), taskSubject,
+						sessionUser.getOrgId() + "");
+		return workFlowTaskIdsResult.getData();
+	}
+
+	/**
+	 * 开始处理任务方法
+	 * 
+	 * @param tblReportTemplate
+	 * @param sessionUser
+	 * @param workFlowTaskIds
+	 * @return
+	 */
+	public WorkFlowId startProcessingTask(TblReportTemplate tblReportTemplate,
+			SessionUser sessionUser, WorkFlowTaskIds workFlowTaskIds) {
+		TypedResult<WorkFlowId> workFlowIdList = workFlowService
+				.startProcessingTask(workFlowTaskIds.getWorkflowId(),
+						workFlowTaskIds.getTaskId(), sessionUser.getLoginName());
+		return workFlowIdList.getData();
+	}
+
+	/**
+	 * 执行任务方法
+	 * 
+	 * @param tblReportTemplate
+	 * @param sessionUser
+	 * @param workFlowCode
+	 * @param workFlowNode
+	 * @param workFlowTaskIds
+	 * @param workFlowId
+	 * @param taskReceiver
+	 * @param comments
+	 * @param taskSubject
+	 * @return
+	 */
+	public WorkFlowTaskIds executeTask(TblReportTemplate tblReportTemplate,
+			SessionUser sessionUser, WorkFlowCode workFlowCode,
+			WorkFlowNode workFlowNode, WorkFlowTaskIds workFlowTaskIds,
+			WorkFlowId workFlowId, ActionCode actionCode, String taskReceiver,
+			String comments, String taskSubject) {
+		TypedResult<WorkFlowTaskIds> workFlowTaskIdsResult = workFlowService
+				.executeTask(workFlowCode, workFlowId.getWorkflowId(),
+						workFlowTaskIds.getTaskId(),
+						sessionUser.getLoginName(), workFlowNode, actionCode,
+						taskReceiver, comments, taskSubject,
+						sessionUser.getOrgId() + "");
+		return workFlowTaskIdsResult.getData();
+	}
+
+	/**
+	 * 获取本环节的操作功能信息
+	 * 
+	 * @param workFlowNode
+	 * @return
+	 */
+	public List<TaskAction> getTaskActions(WorkFlowNode workFlowNode) {
+		TypedResult<List<TaskAction>> taskActionResult = workFlowService
+				.getTaskActions(workFlowNode);
+		List<TaskAction> taskActionList = taskActionResult.getData();
+		return taskActionList;
+	}
+
+	@Override
+	public Page<Object[]> queryTemplate(Integer pageNumber, Integer pageSize,
+			String beginTime, String endTime, String status, String cycle,
+			String reportName) {
+		List<Object> params = new ArrayList<Object>();
+		StringBuffer sql = new StringBuffer(
+				"select id,name,cycle,create_time,create_people,");
+		sql.append("business_examine_people,statistics_examine_people,financial_examine_people,");
+		sql.append("state from tbl_report_template where 1=1");
+		int index = 1;
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		if (StringUtils.isNotEmpty(beginTime)) {
+			sql.append(" and trunc(create_time,'dd')>=?" + index);
+			try {
+				params.add(sdf.parse(beginTime));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			index++;
+		}
+		if (StringUtils.isNotEmpty(endTime)) {
+			sql.append(" and trunc(create_time,'dd')<=?" + index);
+			try {
+				params.add(sdf.parse(endTime));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			index++;
+		}
+		if (StringUtils.isNotEmpty(status)) {
+			if("1".equals(status)){
+				sql.append(" and (state='1' or state='10') ");
+			}else{
+			sql.append(" and state=?" + index);
+			params.add(status);
+			index++;
+			}
+		}
+		if (StringUtils.isNotEmpty(cycle)) {
+			sql.append(" and cycle=?" + index);
+			params.add(cycle);
+			index++;
+		}
+		if (StringUtils.isNotEmpty(reportName)) {
+			sql.append(" and name like ?" + index);
+			params.add("%" + reportName + "%");
+			index++;
+		}
+		sql.append(" order by create_time desc");
+		return dynamicQuery.nativeQuery(Object[].class, new PageRequest(
+				pageNumber - 1, pageSize), sql.toString(), params.toArray());
+	}
+
+	@Override
+	public TblReportTemplate queryTemplateById(String templateId) {
+		return tblReportTemplateDao.findOne(Integer.valueOf(templateId));
+	}
+
+	@Override
+	public boolean updateExcute(String templateId, String state) {
+		try {
+			TblReportTemplate reportTemplate = tblReportTemplateDao
+					.findOne(Integer.valueOf(templateId));
+			reportTemplate.setState(state);
+			tblReportTemplateDao.save(reportTemplate);
+			return true;
+		} catch (Exception e) {
+			e.getStackTrace();
+			return false;
+		}
+	}
+
+	@Override
+	public String queryRoleBySsoId(String loginName) {
+		return userSsoDao.queryRoleBySsoId(loginName);
+	}
+
+	@Override
+	public String queryOrgNameByOrgId(String orgId) {
+		if (StringUtils.isNotEmpty(orgId)) {
+			String[] orgIds = orgId.split(",");
+			StringBuffer orgNames = new StringBuffer();
+			for (int i = 0; i < orgIds.length; i++) {
+				String sql = "select name from t_sta_dim_org where orgid=?1";
+				List<Object> params = new ArrayList<Object>();
+				params.add(orgIds[i]);
+				List<String> list = dynamicQuery.nativeQuery(String.class, sql,
+						params);
+				if (list.size() == 0)
+					continue;
+				String name = list.get(0);
+				orgNames.append(name).append(";");
+			}
+			return orgNames.toString().trim();
+		} else {
+			return null;
+		}
+	}
+
+	@Override
+	public String queryRoleNameByRoleId(String roleId) {
+		if (StringUtils.isNotEmpty(roleId)) {
+			String[] roleIds = roleId.split(",");
+			StringBuffer roleNames = new StringBuffer();
+			for (int i = 0; i < roleIds.length; i++) {
+				String name = roleMngDao.getNameById(Integer
+						.valueOf(roleIds[i]));
+				if (name == null)
+					continue;
+				roleNames.append(name).append(";");
+			}
+			return roleNames.toString().trim();
+		} else {
+			return null;
+		}
+	}
+
+	/** kyf 流程 */
+	@Override
+	public String getTemplateTaskSubject(String loginName, String nodeId,
+			String workflowId, boolean isBack) {
+
+		// 通过模版流程id查找模版对象
+		
+		String taskSubject = "";
+		if (WorkFlowNode.TJ_TemplateBuild.getId().equals(nodeId)
+				|| WorkFlowNode.TJ_OrgCheck.getId().equals(nodeId)
+				|| WorkFlowNode.TJ_TjOrgCheck.getId().equals(nodeId)) {
+			
+			TblReportTemplate trt = tblReportTemplateDao.getTblReportTemplateByWorkflowId(workflowId);
+			
+			taskSubject = "模版编号：" + trt.getNo();
+			if (isBack) {
+				taskSubject = "模版编号：" + trt.getNo();
+			}
+
+		} else if (WorkFlowNode.TJ_ManagerCheck.getId().equals(nodeId)) {
+
+			TblReportTemplate trt = tblReportTemplateDao.getTblReportTemplateByWorkflowId(workflowId);
+
+			taskSubject = "模版编号：" + trt.getNo();
+			if (isBack) {
+				taskSubject = "模版编号：" + trt.getNo();
+			}
+		} else if (nodeId.equals(WorkFlowNode.TJ_ReportWrite.getId())) {
+
+			String sql="";
+			sql="select template_id,workflow_id from tbl_template_submit where workflow_id="+workflowId;
+			
+			List<Object[]> list = dynamicQuery.nativeQuery(Object[].class, sql.toString());
+			if(list.size()>0){
+			   Object[] obj = list.get(0);
+			   String id = obj[0].toString();
+			   TblReportTemplate trt = tblReportTemplateDao.findOne(Integer.parseInt(id));
+			   taskSubject = "模版编号：" + trt.getNo();
+			}
+			
+		} else if (nodeId.equals(WorkFlowNode.TJ_ReportCheck.getId())) {
+			if (isBack) {
+				SessionUser curUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+				taskSubject = "退回人：" + curUser.getUserName();
+			}
+		}
+
+		return taskSubject;
+	}
+
+	/**
+	 * 报表汇集/填写/审核主题
+	 */
+	@Override
+	public String getReportTaskSubject(String workflowId, boolean isBack) {
+
+		TblReportTemplate trt = tblReportTemplateDao
+				.findReportTemplateByWorkflow(workflowId);
+		String taskSubject = "";
+		if (trt != null) {
+			taskSubject = "编号: " + trt.getNo() + " 名称：" + trt.getName();
+		} else {
+			taskSubject = "编号: " + " 名称：";
+		}
+
+		if (isBack) {
+			taskSubject += "(流程退回)";
+		}
+		return taskSubject;
+	}
+	@Override
+	public WorkFlowTaskIds auditCommitOrSendBack(WorkFlowCode wfc,
+			String workflowId, String wfTaskId, String loginName,
+			WorkFlowNode wfn, ActionCode ac, String comments, String orgId,String receivers,String nodeId)
+			throws Exception {
+		String taskReceiver = "";
+		RoleCode roleCode = this.getRoleCode(wfn.getId());
+		logger.info("roleCode=================" + roleCode);
+		if (roleCode != null) {
+			if("100510".equals(nodeId)){
+				receivers = receivers.substring(0, receivers.length()-1);
+				taskReceiver = receivers;
+			}else{
+			taskReceiver = this.getTaskReceiver(orgId, roleCode.getId());// 读取接收人
+			}
+		}
+		logger.info("taskReceiver=================" + taskReceiver);
+		String taskSubject = this.getTemplateTaskSubject(loginName,wfn.getId(),workflowId,
+				ActionCode.SEND_BACK.getCodeId().equals(ac.getCodeId()) ? true
+						: false);
+		
+		workFlowService.startProcessingTask(workflowId,wfTaskId,loginName);
+		
+		TypedResult<WorkFlowTaskIds> typedResult = workFlowService.executeTask(
+				wfc, workflowId, wfTaskId, loginName, wfn, ac, taskReceiver,
+				comments, taskSubject, orgId);
+		if (!typedResult.getSuccess()) {
+			throw new Exception("webservice发送流程失败!");
+		}
+		return typedResult.getData();
+	}
+
+	@Override
+	public WorkFlowTaskIds auditSendBack(WorkFlowCode wfc, String workflowId,
+			String wfTaskId, String loginName, WorkFlowNode wfn, ActionCode ac,
+			String comments, String orgId, String receivers) throws Exception {
+		String taskReceiver = "";
+		logger.info("taskReceiver=================" + taskReceiver);
+		String taskSubject = this.getTemplateTaskSubject(loginName,wfn.getId(),workflowId,
+				ActionCode.SEND_BACK.getCodeId().equals(ac.getCodeId()) ? true
+						: false);
+		
+		workFlowService.startProcessingTask(workflowId,wfTaskId,loginName);
+		TypedResult<WorkFlowTaskIds> typedResult = workFlowService.executeTask(
+				wfc, workflowId, wfTaskId, loginName, wfn, ac, taskReceiver,
+				comments, taskSubject, orgId);
+		if (!typedResult.getSuccess()) {
+			throw new Exception("webservice发送流程失败!");
+		}
+		return typedResult.getData();
+	}
+
+	@Transactional
+	@Override
+	public WorkFlowTaskIds auditFinish(WorkFlowCode wfc, String workflowId,
+			String wfTaskId, String loginName, WorkFlowNode wfn, ActionCode ac,
+			String comments, String orgId) throws Exception {
+		if (WorkFlowCode.ReportWorkflow.getCodeId().equals(wfc.getCodeId())) {
+			//更新发布人、发布时间
+			SessionUser curUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+			String userName = curUser.getUserName();
+			Date date = new Date();
+			tblTemplateSubmitDao.updateByWorkflowId(userName,date, workflowId);
+			
+			dateSummarizeService.updateStatusByWorkflowId(workflowId);//sum表更新为已发布；
+			TblTemplateSum tblTemplateSum = tblTemplateSumDao.findTblTemplateSumByTemplateId(workflowId);
+			TblReportTemplate tblReportTemplate = tblReportTemplateDao.findReportTemplateById(tblTemplateSum.getTemplateId());
+			if("1".equals(tblReportTemplate.getCycle())){//对于一次性填报，发布后，更新其状态
+			tblReportTemplate.setState(Contants.STATE_FAILUE);//已失效
+			tblReportTemplateDao.save(tblReportTemplate);
+			}
+			}else if (WorkFlowCode.TemplateWorkflow.getCodeId().equals(
+				wfc.getCodeId())) {
+
+		}
+		TypedResult<WorkFlowTaskIds> typedResult = workFlowService.executeTask(
+				wfc, workflowId, wfTaskId, loginName, wfn, ac, "", comments,
+				"", orgId);
+		if (!typedResult.getSuccess()) {
+			throw new Exception("webservice发送流程失败!");
+		}
+		return typedResult.getData();
+	}
+
+	/** kyf 流程 */
+
+	@Override
+	public RoleCode getRoleCode(String nodeId) {
+		if (nodeId.equals(WorkFlowNode.TJ_TemplateBuild.getId())) {
+			return RoleCode.TJ_OrgCheck;
+		} else if (nodeId.equals(WorkFlowNode.TJ_OrgCheck.getId())) {
+			return RoleCode.TJ_TjOrgCheck;
+		} else if (nodeId.equals(WorkFlowNode.TJ_TjOrgCheck.getId())) {
+			return RoleCode.TJ_ManagerCheck;
+		} else if (nodeId.equals(WorkFlowNode.TJ_ManagerCheck.getId())) {
+			return RoleCode.TJ_TemplatePublish;
+		}
+
+		/*
+		 * else if (nodeId.equals(WorkFlowNode.TJ_ReportCollect.getId())) {
+		 * return RoleCode.TJ_ReportCollect; }
+		 */
+
+		else if (nodeId.equals(WorkFlowNode.TJ_ReportWrite.getId())) {
+			return RoleCode.TJ_ReportCheck;
+		} else if (nodeId.equals(WorkFlowNode.TJ_ReportCheck.getId())) {
+			return RoleCode.TJ_ReportWrite;
+		}
+		return null;
+	}
+
+	@Override
+	public void updateTemplateModel(String actionCode,String workflowId, String nodeId,
+			SessionUser curUser) {
+		TblReportTemplate tblReportTemplate = this
+				.getTemplateByWorkflowId(workflowId);
+		Date now = new Date();
+		if (WorkFlowNode.TJ_OrgCheck.getId().equals(nodeId)) {// 部门审核
+			tblReportTemplate.setBusinessExaminePeople(curUser.getLoginName()
+					+ "");
+			tblReportTemplate.setBusinessExamineTime(now);
+			//tblReportTemplate.setState(Contants.STATE_DEP_CHECK);
+			tblReportTemplate.setState(Contants.STATE_GROUP_CHECK);
+		} else if (WorkFlowNode.TJ_TjOrgCheck.getId().equals(nodeId)) {// 统计组审核
+			tblReportTemplate.setStatisticsExaminePeople(curUser.getLoginName()
+					+ "");
+			tblReportTemplate.setStatisticsExamineTime(now);
+			//tblReportTemplate.setState(Contants.STATE_GROUP_CHECK);
+			tblReportTemplate.setState(Contants.STATE_CHARGE_CHECK);
+		} else if (WorkFlowNode.TJ_ManagerCheck.getId().equals(nodeId)) {// 负责人审核
+			tblReportTemplate.setFinancialExaminePeople(curUser.getLoginName()
+					+ "");
+			tblReportTemplate.setFinancialExamineTime(now);
+			//tblReportTemplate.setState(Contants.STATE_CHARGE_CHECK);
+			tblReportTemplate.setState(Contants.STATE_TEMPLATE_RELEASE);
+		} else if (WorkFlowNode.TJ_TemplatePublish.getId().equals(nodeId)) {// 模板发布
+			tblReportTemplate.setReleasePeople(curUser.getLoginName() + "");
+			tblReportTemplate.setReleaseTime(now);
+			tblReportTemplate.setState(Contants.STATE_RELEASE);
+			String cycle = tblReportTemplate.getCycle();
+			if (null != cycle
+					&& cycle.equals(String.valueOf(Contants.CYCLE_ONCE))) {
+				try {
+					// 模板发布，启动报送流程
+					String reportWrite = this.getTaskSender(String.valueOf(String
+							.valueOf(tblReportTemplate.getId())),
+							RoleCode.TJ_ReportWrite.getId());// 数据填写人
+					// 数据收集
+					String reportCollect = this
+							.getTaskReceiver(RoleCode.TJ_ReportCollect.getId());// 数据收集
+
+					logger.info("一次性报表，接收人/发送人："
+							+ (reportCollect.concat("/").concat(reportWrite)));
+					// 填报人和汇总人不为空
+					if (StringUtils.isNotEmpty(reportWrite)
+							&& StringUtils.isNotEmpty(reportCollect)) {// 如果角色和机构下对应的人员是空的，则不发待办
+						// 任务主题
+						String taskSubject = "模版编号：" + tblReportTemplate.getNo();
+						int count = 1;
+						boolean flag = true;
+						do {
+							// 启动流程并处理返回结果
+							count += 1;
+							String json = task.startWithWorkflowType(
+									taskSubject,
+									reportCollect.concat("/").concat(
+											reportWrite));
+							JSONObject object = JSONObject.fromObject(json);
+							if (object.getBoolean("success")) {
+								flag = true;
+								logger.info("流程启动成功,正在保存数据....");
+								task.save(json, tblReportTemplate);
+							} else {
+								flag = false;
+								logger.info("待办流程正在尝试第" + (count - 1) + "重发...");
+								Thread.sleep(10L * 1000L);
+							}
+							
+						} while (!flag && count <= 5);
+					}
+				} catch (Exception e) {
+					logger.error("一次性填表，启动流程发生异常，原因："+e.getMessage());
+				}
+			}
+		}
+		if(ActionCode.SEND_BACK.getCodeId().equals(actionCode)){
+			tblReportTemplate.setState(Contants.STATE_SENDBACK);
+		}
+		tblReportTemplateDao.save(tblReportTemplate);
+	}
+
+	/**
+	 * 获取这个角色下的所有部门编号
+	 * 
+	 * @param roleId
+	 * @return
+	 */
+	public List<Object[]> getAllOrgUnderRolerId(String roleId) {
+		StringBuffer sb = new StringBuffer();
+		sb.append(
+				"select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%,")
+				.append(roleId).append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%,")
+				.append(roleId).append("%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%")
+				.append(roleId).append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%")
+				.append(roleId).append("%' ");
+
+		return dynamicQuery.nativeQuery(Object[].class, sb.toString(),
+				new ArrayList<Object>().toArray());
+	}
+
+	/**
+	 * 获取这个角色下的所有部门编号
+	 * 
+	 * @param roleId
+	 * @return
+	 */
+	public List<Object[]> getAllUserUnderRolerId(String roleId) {
+		StringBuffer sb = new StringBuffer();
+		sb.append(
+				"select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%,")
+				.append(roleId).append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%,")
+				.append(roleId).append("%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%")
+				.append(roleId).append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.role_id like '%")
+				.append(roleId).append("%' ");
+
+		return dynamicQuery.nativeQuery(Object[].class, sb.toString(),
+				new ArrayList<Object>().toArray());
+	}
+
+	/**
+	 * 获取这个部门下的所有人员
+	 * 
+	 * @param orgCode
+	 * @return
+	 */
+	public List<Object[]> getAllUserUnderOrgId(String orgCode) {
+		String jpql = "select u.sso_id,u.login_name from tb_user_sso u where u.org_code =?1";
+		return dynamicQuery.nativeQuery(Object[].class, jpql, orgCode);
+	}
+
+	@Override
+	public List<TblReportTemplate> getTemplateByStatusAndCycle(String status,
+			int cycle) {
+		return tblReportTemplateDao.findTemplateByStatusAndCycle(status,
+				String.valueOf(cycle));
+	}
+
+	@Override
+	public TblReportTemplate getReportTemplateId(String workflowId) {
+		return tblReportTemplateDao.findReportTemplateByWorkflowId(workflowId);
+	}
+
+	/**
+	 * 获取任务发起人
+	 * 
+	 * @param roleId
+	 * @return
+	 */
+	public String getTaskSender(String templateId, String roleId) {
+		StringBuffer sb = new StringBuffer();
+		TblReportTemplate tr = tblReportTemplateDao
+				.findReportTemplateById(Integer.parseInt(templateId));
+		String[] orgs = tr.getSubmitOrg().split(",");
+		for (int i = 0; i < orgs.length; i++) {
+			StringBuffer sb1 = new StringBuffer();
+			List<Object[]> list = this.getAllUserUnderOrgRole(orgs[i], roleId);
+			if (list.size() > 0) {
+				for (int j = 0; j < list.size(); j++) {
+					sb1.append(list.get(j)[1]).append(",");
+				}
+				logger.info(sb1.toString());
+				sb.append(StringUtils.substringBeforeLast(sb1.toString(), ","))
+						.append("&");
+			}
+		}
+		return StringUtils.substringBeforeLast(sb.toString(), "&");
+	}
+
+	public List<Object[]> getAllUserUnderOrgRole(String orgId, String roleId) {
+		StringBuffer sb = new StringBuffer();
+		sb.append(
+				"select a.org_code,a.sso_id from TB_USER_SSO a where a.org_code='"
+						+ orgId + "' and a.role_id like '%,").append(roleId)
+				.append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.org_code='"
+						+ orgId + "' and a.role_id like '%,").append(roleId)
+				.append("%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.org_code='"
+						+ orgId + "' and a.role_id like '%").append(roleId)
+				.append(",%' ");
+		sb.append(
+				"union select a.org_code,a.sso_id from TB_USER_SSO a where a.org_code='"
+						+ orgId + "' and a.role_id like '%").append(roleId)
+				.append("%' ");
+
+		return dynamicQuery.nativeQuery(Object[].class, sb.toString(),
+				new ArrayList<Object>().toArray());
+	}
+
+	@Override
+	public String getTaskReceiver(String orgIdArrays, String roleId) {
+		StringBuffer sb = new StringBuffer();
+		StringBuffer sql = new StringBuffer();// 存储sql语句
+		StringBuffer username = new StringBuffer();// 存储用户名
+
+		String unameArray[] = getTaskReceiver(roleId).split(",");// 该角色下的所有人员数组
+		String orgIdarrays[] = orgIdArrays.split(",");// 所有部门数组
+		sb.append("select a.sso_id,a.org_code from TB_USER_SSO a where a.org_code in(");
+		for (int i = 0; i < orgIdarrays.length; i++) {
+			sql.append("'" + orgIdarrays[i] + "'").append(",");
+		}
+		String str = StringUtils.substringBeforeLast(sql.toString(), ",");
+		sb.append(str).append(")");
+
+		logger.info("=========" + sb.toString());
+		List<Object[]> userArray = dynamicQuery.nativeQuery(Object[].class,
+				sb.toString(), new ArrayList<Object>().toArray());// 指定填报机构下的所有人员
+
+		// 获取这个角色和机构下的人员,取交集
+		for (int i = 0; i < unameArray.length; i++) {
+			for (int j = 0; j < userArray.size(); j++) {
+				if (unameArray[i].equals(userArray.get(j)[0])) {
+					username.append(unameArray[i]).append(",");
+				}
+			}
+		}
+		return StringUtils.substringBeforeLast(username.toString(), ",");
+	}
+
+	@Override
+	public String queryUserNameByLoginName(Object loginName) {
+		if (loginName != null) {
+			String name = loginName.toString();
+			return userSsoDao.queryUserNameBySsoId(name);
+		}
+		return null;
+	}
+	
+	@Override
+	public List<TaskReceiverBo> findTaskReceiverMenuTreeList(String orgId) {
+		String str ="select 1,t.sso_id,t.user_name from tb_user_sso t where t.role_id like '%,"
+				+ orgId
+				+ ",%' "
+				+ "union select 1,t.sso_id,t.user_name from tb_user_sso t where t.role_id like '"
+				+ orgId
+				+ ",%' "
+				+ "union select 1,t.sso_id,t.user_name from tb_user_sso t where t.role_id like '%,"
+				+ orgId
+				+ "' "
+				+ "union select 1,t.sso_id,t.user_name from tb_user_sso t where t.role_id = '"
+				+ orgId + "' ";
+		List<Object[]> list =dynamicQuery.nativeQuery(str);
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		Map<Long, List<TaskReceiverBo>> listMap=Maps.newHashMap();//父Id有关的节点
+		Map<Long,TaskReceiverBo> map=Maps.newHashMap();//id有关的节点
+		Long pid=null;
+		List<TaskReceiverBo> temp_list=null;
+		TaskReceiverBo menu=null;
+		menu=new TaskReceiverBo(CommonHelper.toLong(0L), CommonHelper.toStr("ssoid"), CommonHelper.toStr("接收人"));
+		map.put(menu.getPid(), menu);
+		for (Object[] objs : list) {
+			pid=CommonHelper.toLong(objs[0]);
+			menu=new TaskReceiverBo(pid, CommonHelper.toStr(objs[1]), CommonHelper.toStr(objs[2]));
+			if(listMap.containsKey(pid)){
+				listMap.get(pid).add(menu);
+			}else{
+				temp_list=Lists.newArrayList();
+				temp_list.add(menu);
+				listMap.put(pid, temp_list);
+			}
+			map.put(menu.getPid(), menu);
+//			if(map.containsKey(pid)){
+//				map.get(pid).getChildren().add(menu);
+//			}
+		}
+		return listMap.get(1L);
+	}
+}

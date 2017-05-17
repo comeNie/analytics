@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd"
+	default-lazy-init="true">
+
+	<!-- 线程执行器配置，用于任务注册 -->
+	<bean id="taskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="10" />
+		<property name="maxPoolSize" value="100" />
+		<property name="queueCapacity" value="500" />
+	</bean>
+
+	<!-- 业务对象 -->
+	<bean id="bizObject" class="com.orienttech.statics.service.timedtask.ExpireJobTask" />
+
+	<!-- 调度业务 -->
+	<bean id="jobList"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="bizObject" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<!-- 增加调度触发器 -->
+	<!-- Cron表达式“0 0 * * * ?”意为：每天15:00执行 -->
+	<bean id="cronTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="jobList" />
+		<property name="cronExpression" value="0 52 11 * * ?" />
+	</bean>
+	<!-- 该调度表示，延迟10秒启动，然后每隔1分钟执行一次。 -->
+	<bean id="taskTrigger" class="org.springframework.scheduling.quartz.SimpleTriggerBean">
+		<property name="jobDetail" ref="jobList" />
+		<property name="startDelay" value="10000" />
+		<property name="repeatInterval" value="60000" />
+	</bean>
+	<!-- 设置调度 -->
+	<bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="triggers">
+			<list>
+				<ref bean="cronTrigger" />
+			</list>
+		</property>
+		<property name="taskExecutor" ref="taskExecutor" />
+	</bean>
+</beans>

@@ -1,0 +1,292 @@
+package com.orienttech.statics.web.controller.updateDatas;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.propertyeditors.CustomDateEditor;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.ServletRequestDataBinder;
+import org.springframework.web.bind.annotation.InitBinder;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.dao.entity.FinancialLedgerDetails;
+import com.orienttech.statics.service.model.usermng.OrgDeptBo;
+import com.orienttech.statics.service.updateDatas.UpdateDatasService;
+import com.orienttech.statics.service.usermng.OrgDeptService;
+
+@RequestMapping("/updateDatas")
+@Controller
+public class UpdateDatasController extends BaseController {
+	
+	Logger logger = LoggerFactory.getLogger(UpdateDatasController.class);
+	
+	@Autowired
+	private UpdateDatasService updateDatasService;
+	@Autowired
+	private OrgDeptService orgDeptService;
+	
+	@RequestMapping
+	public String index(Long functionId,Model model){
+		List<OrgDeptBo> boList = orgDeptService.findAllOrgDepts();
+		model.addAttribute("boList", boList);
+		return "/updateDatas/updateDatas";
+	}
+	/**
+	 * 单条新增
+	 * @author wangxy 20160415
+	 * @return
+	 */
+	@RequestMapping("/doAdd")
+	@ResponseBody
+	public Result add(String orgId, String orgName, String lendForm, BigDecimal lendAmt, BigDecimal lengBalance,
+			String financingForm, String platformInstitution,String cashSourceName, String beginDate, String arriveDate,
+			String contractTerm, BigDecimal contractRate,BigDecimal incomeExpense, String fundingSources,
+			String guaranteeMode, String guarantor, String memo){
+		
+		FinancialLedgerDetails fld = new FinancialLedgerDetails();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		
+		String maxRowNum = updateDatasService.getMaxRowNum();
+		fld.setRowNum(Integer.valueOf(maxRowNum) + 1);
+		
+		fld.setOrgId(orgId);//机构id
+		fld.setOrgName(orgName);//机构名
+		fld.setLendForm(lendForm);//拆借形式
+		fld.setLendAmt(lendAmt==null?new BigDecimal(0):lendAmt);//拆借金额
+		fld.setLengBalance(lengBalance);//拆借余额
+		fld.setFinancingForm(financingForm);//融资方式
+		fld.setPlatformInstitution(platformInstitution);//平台机构
+		fld.setCashSourceName(cashSourceName);//资金来源与运用
+		fld.setContractRate(contractRate==null?new BigDecimal(0):contractRate);//利率
+		fld.setIncomeExpense(incomeExpense==null?new BigDecimal(0):incomeExpense);//预期收益与支出
+		fld.setFundingSources(fundingSources);//资金来源渠道
+		fld.setGuaranteeMode(guaranteeMode);//担保方式
+		fld.setGuarantor(guarantor);//担保方
+		fld.setMemo(memo);//备注
+		
+		Date begin_Date = null;//起息日
+		if(StringUtils.isNotBlank(beginDate)){
+			try {
+				begin_Date = sdf.parse(beginDate);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		}
+		Date arrive_Date = null;//到期日
+		if(StringUtils.isNotBlank(arriveDate)){
+			try {
+				arrive_Date = sdf.parse(arriveDate);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		}
+		fld.setBeginDate(begin_Date);
+		fld.setArriveDate(arrive_Date);
+		
+		if(StringUtils.isNotBlank(contractTerm)){
+			fld.setContractTerm(Integer.valueOf(contractTerm));//期限
+		}
+		
+		String now = sdf.format(new Date());
+		Date operateTime = null;
+		try {
+			operateTime = sdf.parse(now);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		fld.setOperateTime(operateTime);//操作时间
+		
+		String flag = updateDatasService.add(fld);
+		return success(flag);
+	}
+	
+	
+	/**
+	 * 获取datatables数据
+	 * @param pageNumber
+	 * @param pageSize
+	 * @param sEcho
+	 * @return
+	 * @author wangxy 20160304
+	 */
+	@RequestMapping("/findAllDatas")
+	@ResponseBody
+	public DataTablesPage findAllDatas(@RequestParam("start") Integer pageNumber,@RequestParam("search[value]") String search,
+			@RequestParam("length") Integer pageSize, Integer sEcho){
+		
+		Page<Object[]> page = updateDatasService.findAllDatas(pageNumber/pageSize + 1,pageSize,search);
+		
+		return new DataTablesPage(sEcho, page);
+	}
+	/**
+	 * 上传文件并录入数据
+	 * @param myfile
+	 * @return
+	 * @author wangxy 20160304
+	 * @throws IOException 
+	 * @throws FileNotFoundException 
+	 */
+	@RequestMapping("/uploadExcel")
+	@ResponseBody
+	public Result uploadExcel(@RequestParam(value = "uploadFile", required = false) MultipartFile myfile) throws FileNotFoundException, IOException{
+
+		String flag1 = updateDatasService.uploadExcel(myfile);//上传文件
+		String flag = "";
+		if(flag1.equals("OK")){
+			flag = updateDatasService.importDatas(flag1);//录入文件内容
+			logger.info("录入内容，flag="+flag);
+		}else{
+			logger.info("上传文件错误，flag="+flag1);
+			return success(flag1);
+		}
+		return success(flag);
+	}
+	/**
+	 * 更新录入
+	 * @return
+	 * @author wangxy 20160304
+	 * @throws IOException 
+	 * @throws FileNotFoundException 
+	 */
+//	@RequestMapping(value = "/importDatas", method = RequestMethod.POST)
+//	@ResponseBody
+//	public String importDatas() throws FileNotFoundException, IOException {
+//
+//		String flag = updateDatasService.importDatas();
+//		
+//		
+//		return flag;
+//	}
+	/**
+	 * 修改信息
+	 * @param fld
+	 * @return
+	 * @author wangxy 20160304
+	 */
+	@RequestMapping("/editDatas")
+	@ResponseBody
+	public Result editDatas(Integer rowNum, String orgId, String orgName,
+			String lendForm, BigDecimal lendAmt, BigDecimal lengBalance,
+			String financingForm, String platformInstitution,
+			String cashSourceName, String beginDate, String arriveDate,
+			String contractTerm, BigDecimal contractRate,
+			BigDecimal incomeExpense, String fundingSources,
+			String guaranteeMode, String guarantor, String memo, String operateTime){
+		FinancialLedgerDetails fld = new FinancialLedgerDetails();
+		fld.setRowNum(rowNum);
+		fld.setOrgId(orgId);
+		fld.setOrgName(orgName);
+		fld.setLendForm(lendForm);
+		fld.setLendAmt(lendAmt==null?new BigDecimal(0):lendAmt);
+		fld.setLengBalance(lengBalance);
+		fld.setFinancingForm(financingForm);
+		fld.setPlatformInstitution(platformInstitution);
+		fld.setCashSourceName(cashSourceName);
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		Date begin_Date = null;
+		if(StringUtils.isNotBlank(beginDate)){
+			try {
+				begin_Date = sdf.parse(beginDate);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		}
+		Date arrive_Date = null;
+		if(StringUtils.isNotBlank(arriveDate)){
+			try {
+				arrive_Date = sdf.parse(arriveDate);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		}
+		Date operate_Time = null;
+		if(StringUtils.isNotBlank(operateTime)){
+			try {
+				operate_Time = sdf.parse(operateTime);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+		}
+		fld.setBeginDate(begin_Date);
+		fld.setArriveDate(arrive_Date);
+		fld.setOperateTime(operate_Time);
+		if(StringUtils.isNotBlank(contractTerm)){
+			fld.setContractTerm(Integer.valueOf(contractTerm));
+		}
+		fld.setContractRate(contractRate==null?new BigDecimal(0):contractRate);
+		fld.setIncomeExpense(incomeExpense==null?new BigDecimal(0):incomeExpense);
+		fld.setFundingSources(fundingSources);
+		fld.setGuaranteeMode(guaranteeMode);
+		fld.setGuarantor(guarantor);
+		fld.setMemo(memo);
+		String flag = updateDatasService.modifyDatas(fld);
+		return success(flag);
+	}
+	
+	
+	
+	@RequestMapping("/doDelete")
+	@ResponseBody
+	public String deleteData(Integer rowNum){
+		String flag = updateDatasService.deleteData(rowNum);
+		return flag;
+	}
+	
+	@RequestMapping("/exportExcel")
+	@ResponseBody
+	public String exportExcel(){
+		String fileName = updateDatasService.exportExcel();
+		if(fileName == null){
+			return "false";
+		}
+		
+		return fileName;
+	}
+	
+	@InitBinder
+	public void initBinder(ServletRequestDataBinder binder){
+
+		binder.registerCustomEditor(Date.class, new CustomDateEditor(new SimpleDateFormat("yyyy-MM-dd"), false));
+
+	}
+	
+@RequestMapping("/download")
+public void download(String outFileName, HttpServletRequest req, HttpServletResponse resp){
+ 
+  try {
+//         String filePath = FreemarkerUtils.wordPath+File.separator + outFileName + ".xlsx";
+     logger.info("文件生成路径："+outFileName);
+     FileUtils.downloadFile(new File(outFileName), "资金拆借表.xlsx", req, resp);
+    
+  } catch (IOException e) {
+     e.printStackTrace();
+     try {
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND, "文件未生成");
+         } catch (IOException e1) {
+            e1.printStackTrace();
+         }
+      }
+   }
+}

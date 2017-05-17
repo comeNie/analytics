@@ -1,0 +1,8 @@
+com\orienttech\statics\service\TestReportDataService.class
+com\orienttech\statics\service\TestService.class
+com\orienttech\statics\service\TestUserService.class
+com\orienttech\statics\service\TestAutoExecService.class
+com\orienttech\statics\service\TestUserLogService.class
+com\orienttech\statics\service\TestFixedNumberService.class
+com\orienttech\statics\service\TestReportService.class
+com\orienttech\statics\webservice\TestWebService.class

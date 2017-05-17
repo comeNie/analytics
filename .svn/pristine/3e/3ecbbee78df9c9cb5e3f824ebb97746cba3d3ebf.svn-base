@@ -1,0 +1,146 @@
+package com.orienttech.statics.service.monitorMng.impl;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.EastlendingMonitorDao;
+import com.orienttech.statics.dao.entity.EastlendingMonitor;
+import com.orienttech.statics.service.monitorMng.MonitorMngService;
+
+@Service
+public class MonitorMngServiceImpl implements MonitorMngService {
+	
+	private static final Logger logger = LoggerFactory.getLogger(MonitorMngServiceImpl.class); 
+	
+	@Autowired
+	private EastlendingMonitorDao eastlendingMonitorDao;
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	
+	@Override
+	public Page<Object[]> findAll(Integer pageNumber, Integer pageSize, String search) {
+		
+		StringBuffer sql = new StringBuffer("select t.id,t.the_date,t.name,t.type,t.type_name,t.upload_time,t.link,t.file_name"
+					+ " from TB_EASTLENDING_MONITOR t where 1=1 ");
+			
+		String regx = "^[0-9]*$";
+		Pattern pat = Pattern.compile(regx);
+		Matcher mat = pat.matcher(String.valueOf(search));
+		
+		if (StringUtils.isNotEmpty(search)) {
+			if (mat.find()) {
+//				sql.append(" and t.id like '%"+search+"%'");
+			}else{//根据type_name查询
+				sql.append(" and t.name like '%"+search+"%'");
+			}
+		}
+		sql.append(" order by t.id");
+		
+		return dynamicQuery.nativeQuery(Object[].class, new PageRequest(
+				pageNumber - 1, pageSize), sql.toString());
+	}
+	
+	@Transactional
+	@Override
+	public void delete(Integer id) {
+		
+		eastlendingMonitorDao.delete(id);
+		
+	}
+	@Override
+	public String add(MultipartFile myfile,EastlendingMonitor em) {
+		String msg = "保存成功！";
+		Date date = new Date();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		Date uploadTime = null;
+		try {
+			uploadTime = sdf.parse(sdf.format(date));
+		} catch (ParseException e) {
+			msg = "日期格式转换失败！";
+			e.printStackTrace();
+			return msg;
+		}
+		if(em.getType().equals("1")){
+			em.setTypeName("注册");
+		}else if(em.getType().equals("2")){
+			em.setTypeName("充值");
+		}else if(em.getType().equals("3")){
+			em.setTypeName("提现");
+		}else{
+			em.setTypeName("投资");
+		}
+		em.setUploadTime(uploadTime);
+		
+		if (myfile != null && !myfile.isEmpty()) {//文件内容不为空
+			// 服务器路径
+			String serverPath = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.DATA_MONITOR_MNG) + File.separator;
+			// 最终上传的文件命名以当前时间毫秒数为命名规则
+			Date nowDate = new Date();
+			String originalName = myfile.getOriginalFilename();
+			String fileName = nowDate.getTime() + originalName.substring(originalName.lastIndexOf("."));
+//			String fileNameCn = originalName.substring(0, originalName.lastIndexOf("."));
+			String finalPath = serverPath + fileName;
+			em.setLink(finalPath);
+			em.setFileName(originalName);
+			
+			logger.info("finalPath:" + finalPath);
+			try {
+				// 判断文件目录是否存在
+				File director = new File(serverPath);
+				if (!FileUtils.isExists(director)) {
+					director.mkdirs();// 如果不存在，则新建文件目录
+				}
+				FileOutputStream fos = new FileOutputStream(finalPath);
+				FileUtils.outputFile(myfile.getBytes(), fos);// 上传模板文件
+			} catch (FileNotFoundException e) {
+				msg = "上传文件错误，请联系系统管理员！";
+				e.printStackTrace();
+				throw new RuntimeException("上传文件错误，请联系系统管理员！");
+			} catch (IOException e) {
+				msg = "上传文件错误，请联系系统管理员！";
+				e.printStackTrace();
+				throw new RuntimeException("上传文件错误，请联系系统管理员！");
+			}
+		}else{
+			msg = "请先上传文件！";
+			return msg;
+		}
+		
+		eastlendingMonitorDao.save(em);
+		
+		return msg;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+}

@@ -1,0 +1,39 @@
+package com.orienttech.statics.service.model.workflow;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+public class Test{
+
+	public static void main(String[] args){
+		
+		List<String> list1 = new ArrayList<String>();
+		List<String> list2 = new ArrayList<String>();
+		list1.add("aaa");
+		list1.add("bbb");
+		list1.add("ccc");
+		list1.add("ddd");
+		list1.add("eee");
+		
+		for(int i=list1.size()-1;i>=0; i--){
+			if(list1.get(i)=="aaa"){
+				list1.remove(i);
+			}
+		}
+		
+		list2=list1;
+		for(String li : list2){
+			System.out.println(li);
+		}
+		
+		
+		
+		
+		
+		
+		
+	}
+		
+}
+

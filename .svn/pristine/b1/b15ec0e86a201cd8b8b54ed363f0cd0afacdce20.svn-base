@@ -1,0 +1,165 @@
+package com.orienttech.statics.service.mobileReportMng.impl;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.utils.CalendarUtils;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.MobileMngDao;
+import com.orienttech.statics.dao.UserSsoDao;
+import com.orienttech.statics.dao.entity.mobile.MobileBriefReport;
+import com.orienttech.statics.service.mobileReportMng.MobileReportMngService;
+
+@Service
+public class MobileReportMngServiceImpl implements MobileReportMngService {
+	
+	private static final Logger logger = LoggerFactory.getLogger(MobileReportMngServiceImpl.class); 
+
+	@Autowired
+	private UserSsoDao userSsoDao;
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private MobileMngDao mobileMngDao;
+	
+	/**
+	 * TODO
+	 */
+	@Override
+	public Page<Object[]> queryMobileReport(Integer pageNumber, Integer pageSize,
+			String beginTime, String endTime,String reportDesc,String submitPersonName) {
+		List<Object> params = new ArrayList<Object>();
+		//StringBuffer sql = new StringBuffer("select t.id,t.report_desc,t.description,t.submit_person_name,t.submit_time,t.submit_org_id,t.belongs_org_id");
+		StringBuffer sql = new StringBuffer("select t.id,t.report_desc,t.description,t.submit_person_name,t.busi_date,t.submit_org_id,t.belongs_org_id");
+		sql.append(" from mobile_brief_report t where 1=1");
+		int index = 1;
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		if (StringUtils.isNotEmpty(beginTime)) {
+			sql.append(" and trunc(submit_time,'dd')>=?" + index);
+			try {
+				params.add(sdf.parse(beginTime));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			index++;
+		}
+		if (StringUtils.isNotEmpty(endTime)) {
+			sql.append(" and trunc(submit_time,'dd')<=?" + index);
+			try {
+				params.add(sdf.parse(endTime));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			index++;
+		}
+		if (StringUtils.isNotEmpty(reportDesc)) {
+			sql.append(" and report_desc like ?" + index);
+			params.add("%" + reportDesc + "%");
+			index++;
+		}
+		if (StringUtils.isNotEmpty(submitPersonName)) {
+			sql.append(" and submit_person_name like ?" + index);
+			params.add("%" + submitPersonName + "%");
+			index++;
+		}
+		sql.append(" order by submit_time desc");
+		return dynamicQuery.nativeQuery(Object[].class, new PageRequest(
+				pageNumber - 1, pageSize), sql.toString(), params.toArray());
+	}
+
+	/*
+	 * TODO
+	 */
+	@Override
+	public String queryUserNameByLoginName(Object loginName) {
+		if (loginName != null) {
+			String name = loginName.toString();
+			return userSsoDao.queryUserNameBySsoId(name);
+		}
+		return null;
+	}
+	
+	
+	@Transactional
+	@Override
+	public void modifyMobileDesc(String description, Integer mobileId) {
+		
+		mobileMngDao.modifyMobileDesc(description, mobileId);
+		
+	}
+
+	@Override
+	public void saveMobileReport(MobileBriefReport mobile,MultipartFile myfile) {
+		Date nowDate = new Date();
+		if (myfile != null && !myfile.isEmpty()) {//文件内容不为空
+			// 服务器路径
+			String serverPath = System.getProperty("user.home") 
+					+ PropertiesConstants.getString(PropertiesConstants.DATA_MOBILE) + File.separator + CalendarUtils.getDateContents();
+			// 最终上传的文件命名以当前时间毫秒数为命名规则
+			String fileName = nowDate.getTime() + ".doc";
+			String finalPath = serverPath + fileName;
+			mobile.setPath(CalendarUtils.getDateContents()+ fileName);
+			logger.info("finalPath:" + finalPath);
+			try {
+				// 判断文件目录是否存在
+				File director = new File(serverPath);
+				if (!FileUtils.isExists(director)) {
+					director.mkdirs();// 如果不存在，则新建文件目录
+				}
+				FileOutputStream fos = new FileOutputStream(finalPath);
+				// FileUtils.outputFile(file, fos);//上传模板文件
+				FileUtils.outputFile(myfile.getBytes(), fos);// 上传模板文件
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new RuntimeException("保存文件错误，请联系系统管理员！");
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new RuntimeException("保存文件错误，请联系系统管理员！");
+			}
+		}
+		mobileMngDao.save(mobile);
+	}
+
+	@Override
+	public String queryOrgNameByOrgId(String orgId) {
+		if (StringUtils.isNotEmpty(orgId)) {
+			String[] orgIds = orgId.split(",");
+			StringBuffer orgNames = new StringBuffer();
+			for (int i = 0; i < orgIds.length; i++) {
+				String sql = "select description from t_sta_dim_org where orgid=?1";
+				List<Object> params = new ArrayList<Object>();
+				params.add(orgIds[i]);
+				List<String> list = dynamicQuery.nativeQuery(String.class, sql,
+						params);
+				if (list.size() == 0)
+					continue;
+				String name = list.get(0);
+				orgNames.append(name).append(";");
+			}
+			String orgName = orgNames.toString().trim();
+			orgName = orgName.substring(0, orgName.length()-1);
+			return orgName;
+		} else {
+			return null;
+		}
+	}
+	
+}

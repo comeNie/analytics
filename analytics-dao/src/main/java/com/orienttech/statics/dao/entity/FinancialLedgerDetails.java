@@ -1,0 +1,275 @@
+package com.orienttech.statics.dao.entity;
+
+import static com.orienttech.statics.commons.utils.Contants.TJ_SCHEMA;
+
+import java.math.BigDecimal;
+import java.util.Date;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+import com.orienttech.statics.commons.entity.BaseEntity;
+
+
+@Entity
+@Table(name = "FINANCIAL_LEDGER_DETAILS", schema = TJ_SCHEMA)
+public class FinancialLedgerDetails extends BaseEntity {
+	
+	private static final long serialVersionUID = 6872424412924383366L;
+	
+//	@Id
+//	@SequenceGenerator(name = "generator", sequenceName="SEQ_FINANCIAL_LEDGER_DETAILS", allocationSize = 1)
+//	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "generator")
+//	@Column(name="ROW_NUM")
+//	private Integer rowNum;//序号
+	@Id
+	@Column(name="ROW_NUM")
+	private Integer rowNum;//序号
+	
+	@Column(name="ORG_ID",length=20)
+	private String orgId;//机构ID
+	
+	@Column(name="ORG_NAME",length=100)
+	private String orgName;//机构名
+	
+	@Column(name="LEND_FORM",length=20)
+	private String lendForm;//拆借形式
+	
+	@Column(name="LEND_AMT")
+	private BigDecimal lendAmt;//拆借金额
+	
+	@Column(name="LENG_BALANCE")
+	private BigDecimal lengBalance;//拆借余额
+	
+	@Column(name="FINANCING_FORM",length=80)
+	private String financingForm;//融资方式
+	
+	@Column(name="PLATFORM_INSTITUTION",length=100)
+	private String platformInstitution;//平台机构
+	
+	@Column(name="CASH_SOURCE_NAME",length=100)
+	private String cashSourceName;//资金来源与运用
+	
+	@Column(name="BEGIN_DATE",length=20)
+	private Date beginDate;//起息日
+	
+	@Column(name="ARRIVE_DATE",length=20)
+	private Date arriveDate;//到期日
+	
+	@Column(name="CONTRACT_TERM",length=20)
+	private int contractTerm;//期限
+	
+	@Column(name="CONTRACT_RATE")
+	private BigDecimal contractRate;//利率
+	
+	@Column(name="INCOME_EXPENSE")
+	private BigDecimal incomeExpense;//预期收益与支出
+	
+	@Column(name="FUNDING_SOURCES",length=50)
+	private String fundingSources;//资金来源渠道
+	
+	@Column(name="GUARANTEE_MODE",length=200)
+	private String guaranteeMode;//担保方式
+	
+	@Column(name="GUARANTOR",length=200)
+	private String guarantor;//担保方
+	
+	@Column(name="MEMO",length=800)
+	private String memo;//备注
+	
+	@Column(name="OPERATE_TIME",length=20)
+	private Date operateTime;
+
+	public FinancialLedgerDetails() {
+		
+	}
+
+	public FinancialLedgerDetails(Integer rowNum, String orgId, String orgName,
+			String lendForm, BigDecimal lendAmt, BigDecimal lengBalance,
+			String financingForm, String platformInstitution,
+			String cashSourceName, Date beginDate, Date arriveDate,
+			int contractTerm, BigDecimal contractRate,
+			BigDecimal incomeExpense, String fundingSources,
+			String guaranteeMode, String guarantor, String memo,
+			Date operateTime) {
+		super();
+		this.rowNum = rowNum;
+		this.orgId = orgId;
+		this.orgName = orgName;
+		this.lendForm = lendForm;
+		this.lendAmt = lendAmt;
+		this.lengBalance = lengBalance;
+		this.financingForm = financingForm;
+		this.platformInstitution = platformInstitution;
+		this.cashSourceName = cashSourceName;
+		this.beginDate = beginDate;
+		this.arriveDate = arriveDate;
+		this.contractTerm = contractTerm;
+		this.contractRate = contractRate;
+		this.incomeExpense = incomeExpense;
+		this.fundingSources = fundingSources;
+		this.guaranteeMode = guaranteeMode;
+		this.guarantor = guarantor;
+		this.memo = memo;
+		this.operateTime = operateTime;
+	}
+
+
+
+
+
+	public Integer getRowNum() {
+		return rowNum;
+	}
+
+	public void setRowNum(Integer rowNum) {
+		this.rowNum = rowNum;
+	}
+
+	public String getOrgId() {
+		return orgId;
+	}
+
+	public void setOrgId(String orgId) {
+		this.orgId = orgId;
+	}
+
+	public String getOrgName() {
+		return orgName;
+	}
+
+	public void setOrgName(String orgName) {
+		this.orgName = orgName;
+	}
+
+	public String getLendForm() {
+		return lendForm;
+	}
+
+	public void setLendForm(String lendForm) {
+		this.lendForm = lendForm;
+	}
+
+	public BigDecimal getLendAmt() {
+		return lendAmt;
+	}
+
+	public void setLendAmt(BigDecimal lendAmt) {
+		this.lendAmt = lendAmt;
+	}
+
+	public BigDecimal getLengBalance() {
+		return lengBalance;
+	}
+
+	public void setLengBalance(BigDecimal lengBalance) {
+		this.lengBalance = lengBalance;
+	}
+
+	public String getFinancingForm() {
+		return financingForm;
+	}
+
+	public void setFinancingForm(String financingForm) {
+		this.financingForm = financingForm;
+	}
+
+	public String getPlatformInstitution() {
+		return platformInstitution;
+	}
+
+	public void setPlatformInstitution(String platformInstitution) {
+		this.platformInstitution = platformInstitution;
+	}
+
+	public String getCashSourceName() {
+		return cashSourceName;
+	}
+
+	public void setCashSourceName(String cashSourceName) {
+		this.cashSourceName = cashSourceName;
+	}
+
+	public Date getBeginDate() {
+		return beginDate;
+	}
+
+	public void setBeginDate(Date beginDate) {
+		this.beginDate = beginDate;
+	}
+
+	public Date getArriveDate() {
+		return arriveDate;
+	}
+
+	public void setArriveDate(Date arriveDate) {
+		this.arriveDate = arriveDate;
+	}
+
+	public int getContractTerm() {
+		return contractTerm;
+	}
+
+	public void setContractTerm(int contractTerm) {
+		this.contractTerm = contractTerm;
+	}
+
+	public BigDecimal getContractRate() {
+		return contractRate;
+	}
+
+	public void setContractRate(BigDecimal contractRate) {
+		this.contractRate = contractRate;
+	}
+
+	public BigDecimal getIncomeExpense() {
+		return incomeExpense;
+	}
+
+	public void setIncomeExpense(BigDecimal incomeExpense) {
+		this.incomeExpense = incomeExpense;
+	}
+
+	public String getFundingSources() {
+		return fundingSources;
+	}
+
+	public void setFundingSources(String fundingSources) {
+		this.fundingSources = fundingSources;
+	}
+
+	public String getGuaranteeMode() {
+		return guaranteeMode;
+	}
+
+	public void setGuaranteeMode(String guaranteeMode) {
+		this.guaranteeMode = guaranteeMode;
+	}
+
+	public String getGuarantor() {
+		return guarantor;
+	}
+
+	public void setGuarantor(String guarantor) {
+		this.guarantor = guarantor;
+	}
+
+	public String getMemo() {
+		return memo;
+	}
+
+	public void setMemo(String memo) {
+		this.memo = memo;
+	}
+
+	public Date getOperateTime() {
+		return operateTime;
+	}
+
+	public void setOperateTime(Date operateTime) {
+		this.operateTime = operateTime;
+	}
+	
+}

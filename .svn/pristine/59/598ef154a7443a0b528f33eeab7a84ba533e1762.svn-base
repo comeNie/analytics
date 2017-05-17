@@ -1,0 +1,666 @@
+package com.orienttech.statics.service.dateSummarize.impl;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.poi.ss.usermodel.DataFormat;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.shiro.SecurityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.google.common.base.Function;
+import com.google.common.collect.Lists;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.entity.submission.TblReportTemplate;
+import com.orienttech.statics.dao.entity.submission.TblTemplateSubmit;
+import com.orienttech.statics.dao.entity.submission.TblTemplateSum;
+import com.orienttech.statics.dao.submission.TblReportTemplateDao;
+import com.orienttech.statics.dao.submission.TblTemplateSubmitDao;
+import com.orienttech.statics.dao.submission.TblTemplateSumDao;
+import com.orienttech.statics.service.datasubmitted.DataEntryService;
+import com.orienttech.statics.service.dateSummarize.DateSummarizeService;
+import com.orienttech.statics.service.model.submission.TblReportSubmitVO;
+import com.orienttech.statics.service.workflow.WorkFlowService.RoleCode;
+
+@Service
+public class DateSummarizeServiceImpl implements DateSummarizeService {
+
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private TblTemplateSumDao tblTemplateSumDao;
+	@Autowired
+	private TblTemplateSubmitDao tblTemplateSubmitDao;
+	@Autowired
+	private DataEntryService dataEntryService;
+	@Autowired
+	private TblReportTemplateDao tblReportTemplateDao;
+	
+
+	@Override
+	public String ifShowSelectAll(String workflowId) {
+		
+		StringBuffer sb = new StringBuffer("select t.id,t.template_id,t.org_id,t.submit_state,t.workflow_id"
+				+ " from tbl_template_submit t "
+				+ " where t.workflow_id = ?1");
+		
+		List<Object[]> list = dynamicQuery.nativeQuery(Object[].class, sb.toString(), workflowId);
+		
+		String flag = "0";
+		for(Object[] objs : list){
+			String state = CommonHelper.toStr(objs[3]);
+			if(state.equals("1")){
+				flag = "1";
+			}
+		}
+		
+		return flag;
+	}
+
+	/**
+	 * 查询所有记录
+	 * 
+	 * @param pageNumber
+	 *            当前页数
+	 * @param pageSize
+	 *            每页显示条数
+	 * @param workflowId
+	 */
+	@Transactional(readOnly = true)
+	@Override
+	public DataTablesPage findAll(String workflowId, Integer draw,
+			String search, Integer pageNumber, Integer pageSize) {
+
+		StringBuffer sb = new StringBuffer();
+		List<Object> params = Lists.newArrayList();
+		params.add(workflowId);
+		sb.append("select id,org_id,org_id orgname,submit_state,sub_time,real_path from tbl_template_submit where workflow_id = ?1 ");
+		Page<Object[]> page = dynamicQuery.nativeQuery(new PageRequest(
+				pageNumber - 1, pageSize), sb.toString(), params.toArray());
+
+		// return dynamicQuery.query(TblTemplateSubmit.class,new
+		// PageRequest(pageNumber - 1,
+		// pageSize),sb.toString(), workflowId);
+
+		// return dynamicQuery.query(TblTemplateSubmit.class, new PageRequest(
+		// pageNumber - 1, pageSize), sb.toString(), params.toArray());
+
+		DataTablesPage dtPage = new DataTablesPage(draw, page);
+		dtPage.setData(Lists.transform(page.getContent(),
+				new Function<Object[], TblReportSubmitVO>() {
+					@Override
+					public TblReportSubmitVO apply(Object[] objs) {
+						TblReportSubmitVO tblTemplateSubmit = new TblReportSubmitVO(objs);
+						String str = tblReportTemplateDao.findOrgNameById(tblTemplateSubmit.getOrgId());
+						tblTemplateSubmit.setOrgName(str);
+						return tblTemplateSubmit;
+					}
+				}));
+		return dtPage;
+
+	}
+
+	/**
+	 * 
+	 * 报表汇总
+	 * @throws IOException
+	 * @throws FileNotFoundException
+	 * 
+	 */
+	@Override
+	public String reportSummarize(String checkedId, String workflowId, String templateId) throws FileNotFoundException, IOException {
+
+		String message = "OK";
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+		StringBuilder sb = new StringBuilder();
+		sb.append(" select m.real_path 存放路径,m.sum_type 汇总方式 ,m.start_row 汇总开始行,m.template_id 模板id,n.description 机构名"
+				+ " from(select a.real_path ,b.sum_type ,b.start_row ,a.template_id,a.org_id from tbl_template_submit a,tbl_report_template b"
+				+ " where a.id in(" + checkedId + ") and a.template_id=b.id ) m"
+				+ " left join t_sta_dim_org n on m.org_id = n.orgid");
+        
+		List<Object[]> list1 = dynamicQuery.nativeQuery(sb.toString());
+		
+		if (list1.size() > 0) {
+			Object[] obj1 = list1.get(0);
+			if ("1".equalsIgnoreCase(obj1[1].toString())) {//按行汇总
+				int startRow_template = Integer.parseInt(obj1[2].toString());//开始行;
+				Map<Integer, List<Object>> map = new HashMap<Integer, List<Object>>();
+				Map<Integer, List<String>> map_template = new HashMap<Integer, List<String>>();
+				
+				int mapSize = 0;
+				int mapSizeBefore = 0;
+				
+				/**
+				 * 获取模板
+				 */
+				TblReportTemplate tblReportTemplate = tblReportTemplateDao.findOne(Integer.parseInt(templateId));
+				String templatePath = tblReportTemplate.getPath();
+				String filename_template = System.getProperty("user.home") + PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT) + File.separator + templatePath;
+				try{
+					new XSSFWorkbook(new FileInputStream(filename_template));
+				}catch(Exception e){
+					e.printStackTrace();
+					if(e!=null){
+						message = "模板文件上传有误！";
+						return message;
+					}
+				}
+				/**
+				 * 遍历模板表头数据
+				 */
+				XSSFWorkbook workbook_template = new XSSFWorkbook(new FileInputStream(filename_template));
+				XSSFSheet sheet_template = workbook_template.getSheetAt(0);
+				XSSFRow row_template;
+				XSSFCell cell_template;
+				
+				for(int l=0;l<startRow_template-1;l++){
+					List<String> list_template = new ArrayList<String>();
+					row_template = sheet_template.getRow(l);//模板表头行数
+					if(row_template!=null){
+						int column_template = row_template.getPhysicalNumberOfCells();//模板表头列数
+						for (int column = 0; column < column_template; column++) {
+							cell_template = row_template.getCell((short) column);
+							if(cell_template==null){
+								list_template.add("");
+								column_template++;
+							}else{
+							    list_template.add(cell_template.toString());
+							}
+						}
+						}else{
+							list_template.add("");
+						}
+					map_template.put(l, list_template);
+				}
+				
+				/**
+				 * 生成的Excel
+				 */
+				XSSFWorkbook targetWb = new XSSFWorkbook();
+				XSSFSheet targetSheet = targetWb.createSheet("行汇总");
+				
+				List<XSSFCellStyle> styleList = new ArrayList<XSSFCellStyle>();//style集合
+				List<CellRangeAddress> regionList = new ArrayList<CellRangeAddress>();//合并单元格集合
+				
+				/**
+				 * 遍历小贷公司提交的数据
+				 */
+				int i = 0;
+				for (i = 0; i < list1.size(); i++) {
+					Object[] obj = list1.get(i);
+					int startRow = Integer.parseInt(obj[2].toString());// 开始行
+					String path = obj[0].toString();
+					String filename = System.getProperty("user.home")+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+ File.separator + path;//小贷公司提交文档全路径
+					try{
+						new XSSFWorkbook(new FileInputStream(filename));
+					}catch(Exception e){
+						e.printStackTrace();
+						if(e!=null){
+							message = "文件“ " +path+ "” 上传有误！";
+							return message;
+						}
+					}
+					/**
+					 * 小贷公司数据
+					 */
+					XSSFWorkbook loanWb = new XSSFWorkbook(new FileInputStream(filename));
+					XSSFSheet loanSheet = loanWb.getSheetAt(0);
+					XSSFRow row;
+					XSSFCell cell;
+					
+					/**
+					 * TODO
+					 * 合并单元格
+					 */
+					this.getRegionCells(loanSheet,regionList);
+					
+					int rowNum=loanSheet.getLastRowNum();//行数
+					int x=0;
+			        for(;mapSize<mapSizeBefore+rowNum-(startRow_template-1)+1;mapSize++){//mapSize报表起始行数；mapSizeBefore报表结束行数。
+						List<Object> list = new ArrayList<Object>();
+						row = loanSheet.getRow(startRow - 1+x);
+						x++;
+						if(row!=null){
+							int icount = row.getPhysicalNumberOfCells();//本行有多少列
+							for(int count = 0; count < icount; count++) {
+								cell = row.getCell((short) count);
+								
+								XSSFCellStyle tempStyle = this.cloneAllCellStyle(cell, targetWb);
+						   		styleList.add(tempStyle);
+						   		
+								switch (cell.getCellType()) {
+									case XSSFCell.CELL_TYPE_FORMULA:
+										double cellValue1 = cell.getNumericCellValue();
+										list.add(cellValue1);
+										break;
+									case XSSFCell.CELL_TYPE_NUMERIC:
+										double cellValue2 = cell.getNumericCellValue();
+										list.add(cellValue2);
+										break;
+									case XSSFCell.CELL_TYPE_STRING:
+										String cellValue3 = String.valueOf(cell.getRichStringCellValue());
+										list.add(cellValue3);
+										break;
+									default : list.add("");
+								}
+
+							}
+						}else{
+							break;//遇到空行跳出循环，遍历下个报表
+						}
+						map.put(mapSize, list);
+					}
+			        mapSizeBefore=mapSizeBefore+mapSize;
+				}
+				
+				/**
+				 * 写入EXCEL
+				 */
+				Date date = new Date();
+				String fileName = System.getProperty("user.home")+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+ File.separator + sdf.format(date) + ".xlsx";
+				FileOutputStream fos = new FileOutputStream(fileName);
+				
+//				XSSFWorkbook targetWb = new XSSFWorkbook();
+//				XSSFSheet targetSheet = targetWb.createSheet("行汇总");
+				
+				/**
+				 * 写入表头数据
+				 */
+				 for (int tableHead = 0; tableHead < startRow_template-1; tableHead++) {
+					 XSSFRow row = targetSheet.createRow(tableHead);
+					 List<?> listRow_tableHead = (List<?>) map_template.get(tableHead);
+					 XSSFCell headCell = null;
+					 if(listRow_tableHead!=null){
+						 for (int headColumn = 0; headColumn < listRow_tableHead.size(); headColumn++) {
+							 headCell = row.createCell(headColumn);
+							 String obj = (String) listRow_tableHead.get(headColumn);
+							 headCell.setCellValue(obj.toString());
+						 }
+					 }
+				 }
+				 /**
+				  * 表头合并单元格
+				  */
+//				 CellRangeAddress region = null;
+//				 for (int j = 0; j < sheet_template.getNumMergedRegions(); j++) {
+//					region = sheet_template.getMergedRegion(j);
+//					if ((region.getFirstColumn() >= sheet_template.getFirstRowNum()) && (region.getLastRow() <= sheet_template.getLastRowNum())) {
+//						targetSheet.addMergedRegion(region);
+//					}
+//				 }
+				/**
+			     * TODO
+			     * 合并单元格
+			     */
+			    for(CellRangeAddress region1 : regionList){
+			    	targetSheet.addMergedRegion(region1);
+			    }
+				/**
+				 * 写入小贷公司提交的数据
+				 */
+				int mm = 0;
+			    for (int k = 0; k < mapSize; k++) {
+			    	XSSFRow row = targetSheet.createRow(startRow_template - 1+k);
+					List<?> listRow = (List<?>) map.get(k);
+					XSSFCell cell = null;
+					
+					if(listRow!=null){
+						targetSheet.setColumnWidth(k, sheet_template.getColumnWidth(k));//设置列宽，与模板一致
+						
+						for (int j = 0; j < listRow.size(); j++) {
+							cell = row.createCell(j);
+							//设置单元格格式
+							cell.setCellStyle(styleList.get(mm));
+							mm++;
+//							String obj = (String) listRow.get(j);
+							if(listRow.get(j) instanceof String){
+								String objString = (String) listRow.get(j);
+								cell.setCellValue(objString);
+							} else if (listRow.get(j) instanceof Double){
+								double objDouble = (Double) listRow.get(j);
+								cell.setCellValue(objDouble);
+							} else {
+								cell.setCellValue("");
+							}
+							
+						}
+					}
+					
+				}
+			    
+			    targetWb.write(fos);
+				fos.flush();
+				fos.close();
+				// 汇总完成，更新数据库“汇总状态”
+				SessionUser sUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+				String userName = sUser.getUserName();
+				TblTemplateSum tblTemplateSum = tblTemplateSumDao.findTblTemplateSumByTemplateIdAndWId(workflowId, Integer.parseInt(obj1[3].toString()));
+				tblTemplateSum.setPath(sdf.format(date) + ".xlsx");
+				tblTemplateSum.setSumState("1");
+				tblTemplateSum.setSumTime(new Date());
+				tblTemplateSum.setSumPeople(userName);
+				tblTemplateSumDao.save(tblTemplateSum);
+			}
+	
+			if ("2".equalsIgnoreCase(obj1[1].toString())) {// 按页汇总
+				int sum = 0;
+				Date date = new Date();
+				String filenameTarget = System.getProperty("user.home")+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+ File.separator + sdf.format(date) + ".xlsx";// 汇总生成的excel
+				XSSFWorkbook wbTarget = null;
+				FileOutputStream fos = new FileOutputStream(filenameTarget);
+				wbTarget = new XSSFWorkbook();
+				
+				for (sum = 0; sum < list1.size(); sum++) {
+					Object[] obj = list1.get(sum);
+					String path = obj[0].toString();
+					String sheetName = obj[4].toString();//机构名
+	
+					String filenameSource = System.getProperty("user.home")+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+ File.separator + path;// path
+					XSSFWorkbook wbSource = null;
+					try{
+						new XSSFWorkbook(new FileInputStream(filenameSource));
+					}catch(Exception e){
+						e.printStackTrace();
+						if(e!=null){
+							message = "文件：“" +path+ "” 上传有误！";
+							return message;
+						}
+					}
+					wbSource = new XSSFWorkbook(new FileInputStream(new File(filenameSource)));
+					
+					// 单元格合并
+					CellRangeAddress region = null;
+					XSSFSheet sheet1 = (XSSFSheet) wbSource.getSheetAt(0);
+					Sheet sheet2 = wbTarget.createSheet(sum + "");
+					wbTarget.setSheetName(sum, sheetName);
+					for (int i = 0; i < sheet1.getNumMergedRegions(); i++) {
+						region = sheet1.getMergedRegion(i);
+						if ((region.getFirstColumn() >= sheet1.getFirstRowNum()) && (region.getLastRow() <= sheet1.getLastRowNum())) {
+								sheet2.addMergedRegion(region);
+						}
+					}
+	
+					//复制内容
+					XSSFRow rowFrom = null;
+					XSSFRow rowTo = null;
+					XSSFCell cellFrom = null;
+					XSSFCell cellTo = null;
+
+					for (int i = sheet1.getFirstRowNum(); i <= sheet1.getLastRowNum(); i++) {
+						rowFrom = sheet1.getRow(i);
+						if (null == rowFrom) {
+							continue;
+						}
+						rowTo = (XSSFRow) sheet2.createRow(i);
+						rowTo.setHeight(rowFrom.getHeight());
+						for (int j = 0; j < rowFrom.getLastCellNum(); j++) {
+							sheet2.setColumnWidth(j, sheet1.getColumnWidth(j));
+							if (null != sheet1.getColumnStyle(j)) {
+								sheet2.setDefaultColumnStyle(j, sheet1.getColumnStyle(j));
+							}
+	
+							cellFrom = rowFrom.getCell(j);
+							
+							if (null == cellFrom) {
+								continue;
+							}
+							cellTo = rowTo.createCell(j);
+							/**
+							 * 插入格式
+							 */
+							XSSFCellStyle cellStylePage = this.cloneAllCellStyle(cellFrom, wbTarget);
+							cellTo.setCellStyle(cellStylePage);
+
+							if(cellFrom != null){
+								switch (cellFrom.getCellType()) {
+									case XSSFCell.CELL_TYPE_FORMULA:
+										double cellValue1 = cellFrom.getNumericCellValue();
+										cellTo.setCellValue(cellValue1);
+										break;
+									case XSSFCell.CELL_TYPE_NUMERIC:
+										double cellValue2 = cellFrom.getNumericCellValue();
+										cellTo.setCellValue(cellValue2);
+										break;
+									case XSSFCell.CELL_TYPE_STRING:
+										String cellValue3 = String.valueOf(cellFrom.getRichStringCellValue());
+										cellTo.setCellValue(cellValue3);
+										break;
+									default: cellTo.setCellValue("");
+								}
+							}
+						}
+					}
+					sheet2.setDisplayGridlines(true);
+				}
+				
+				wbTarget.write(fos);
+				fos.close();
+				
+				// 汇总完成，更新数据库“汇总状态”
+				SessionUser sUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+				String userName = sUser.getUserName();
+				TblTemplateSum tblTemplateSum = tblTemplateSumDao.findTblTemplateSumByTemplateIdAndWId(workflowId, Integer.parseInt(obj1[3].toString()));
+				tblTemplateSum.setPath(sdf.format(date) + ".xlsx");
+				tblTemplateSum.setSumState("1");
+				tblTemplateSum.setSumTime(new Date());
+				tblTemplateSum.setSumPeople(userName);
+				tblTemplateSumDao.save(tblTemplateSum);
+			}
+		}
+		return message;
+	}
+	
+	public XSSFCell getCell(XSSFRow row, int index) {
+
+		// 取得分发日期单元格
+		XSSFCell cell = row.getCell(index);
+
+		// 如果单元格不存在
+		if (cell == null) {
+
+			// 创建单元格
+			cell = row.createCell(index);
+		}
+
+		// 返回单元格
+		return cell;
+	}
+
+	@Override
+	public void save(TblTemplateSum tblTemplateSum) {
+		tblTemplateSumDao.save(tblTemplateSum);
+	}
+
+	@Override
+	public String findUserByRole(String orgId) {
+		StringBuffer sb = new StringBuffer();
+		/*
+		 * sb.append(
+		 * "select a.USER_ID,a.SSO_ID,org_code  from TB_USER_SSO a where a.ORG_CODE=?1 and ROLE_ID in ("
+		 * + + ")"); List<Object[]> loginNames =
+		 * dynamicQuery.nativeQuery(sb.toString(), orgId);
+		 */
+		String roleId = RoleCode.TJ_ReportWrite.getId();
+		String nativeSql = "select t.SSO_ID,t.user_name from tb_user_sso t where t.ORG_CODE="
+				+ orgId
+				+ " and t.role_id like '%,"
+				+ roleId
+				+ ",%' "
+				+ "union select t.SSO_ID,t.user_name from tb_user_sso t where t.ORG_CODE="
+				+ orgId
+				+ " and t.role_id like '"
+				+ roleId
+				+ ",%' "
+				+ "union select t.SSO_ID,t.user_name from tb_user_sso t where t.ORG_CODE="
+				+ orgId
+				+ " and t.role_id like '%,"
+				+ roleId
+				+ "' "
+				+ "union select t.SSO_ID,t.user_name from tb_user_sso t where t.ORG_CODE="
+				+ orgId + " and t.role_id = '" + roleId + "' ";
+		List<Object[]> loginNames = dynamicQuery.nativeQuery(nativeSql,
+				new ArrayList<Object>().toArray());
+
+		String taskReceiver = "";
+		for (Object[] objArray : loginNames) {
+			if (objArray != null && objArray.length > 0) {
+				if (taskReceiver.equals("")) {
+					taskReceiver += (String) objArray[0];
+				} else {
+					taskReceiver += "," + (String) objArray[0];
+				}
+			}
+		}
+		return taskReceiver;
+	}
+
+	// 退回时更新submit表
+	public void updateByOrgId(String orgId, String workflowId) {
+		TblTemplateSubmit tblTemplateSubmit = tblTemplateSubmitDao.getTemplateSubmitByWorkflowIdAndOrgId(orgId, workflowId);
+		if (tblTemplateSubmit != null) {
+			if (tblTemplateSubmit != null) {
+				tblTemplateSubmit.setSubmitState("3");//已退回
+			}
+			tblTemplateSubmitDao.save(tblTemplateSubmit);
+		}
+	}
+
+	// 发布后更新sum状态为已发布
+	public void updateStatusByWorkflowId(String workflowId) {
+
+		String sql = "select distinct(TEMPLATE_ID) from TBL_TEMPLATE_SUBMIT where WORKFLOW_ID="+ workflowId ;
+		List list = dynamicQuery.nativeQuery(sql);
+		String template_id = list.get(0).toString();
+		TblTemplateSum tblTemplateSum = tblTemplateSumDao.findByTemplateId(Integer.parseInt(template_id));
+		tblTemplateSum.setSumState("2");// 已发布
+		tblTemplateSumDao.save(tblTemplateSum);
+	}
+
+	// 发布后更新submit表发布人和时间
+	/*public void updateReleaseByWorkflowId(String workflowId) {
+
+		SessionUser sUser = new SessionUser();
+		String userName = sUser.getUserName();
+		tblTemplateSubmitDao.updateByWorkflowId(userName, workflowId);
+	}*/
+
+	// 查找汇总状态
+	public String findStatusByTemplateId(String templateId) {
+
+		String sql = "select SUM_STATE,TEMPLATE_ID from TBL_TEMPLATE_SUM where TEMPLATE_ID="
+				+ templateId;
+		List<Object[]> states = dynamicQuery.nativeQuery(sql);
+		Object[] s = states.get(0);
+		String state = s[0].toString();
+		return state;
+	}
+	
+	// 报送日期
+	public String findSubmitTimeByTemplateId(String templateId,Long timeLimit,String workflowId) {
+
+		String sql = "select distinct START_TIME,END_TIME+" + timeLimit + " from TBL_TEMPLATE_SUBMIT where TEMPLATE_ID="
+				+ templateId + " and WORKFLOW_ID ="+workflowId;
+		List<Object[]> states = dynamicQuery.nativeQuery(sql);
+		Object[] s = states.get(0);
+		String start = s[0].toString().substring(0, 10);
+		String end = s[1].toString().substring(0, 10);
+		return start+" 至 "+end;
+	}
+	
+	/**
+	 * TODO 合并单元格
+	 * @param sourceSheet
+	 * @param targetSheet
+	 */
+	public List<CellRangeAddress> getRegionCells(XSSFSheet loanSheet,List<CellRangeAddress> regionList){
+		
+		for (int j=0;j<loanSheet.getNumMergedRegions();j++) {
+			
+			CellRangeAddress region = loanSheet.getMergedRegion(j);
+			
+			regionList.add(region);
+		}
+		
+		return regionList;
+	}
+	
+	
+	/**
+	 * 读取SourceCell的Style，写入targetCell的Style中
+	 * @param sourceCell
+	 * @param targetWb
+	 * @param targetCell
+	 */
+	public XSSFCellStyle cloneAllCellStyle(XSSFCell sourceCell, XSSFWorkbook targetWb){
+		
+		//创建一个样式
+   		XSSFCellStyle tempStyle = targetWb.createCellStyle(); //样式
+		//数值格式,创建字符及数字格式
+   		DataFormat format= targetWb.createDataFormat();
+   		//字体
+   		XSSFFont font= targetWb.createFont();
+   		tempStyle.setDataFormat(format.getFormat( sourceCell.getCellStyle().getDataFormatString()));
+        
+        font.setColor(sourceCell.getCellStyle().getFont().getXSSFColor());
+		font.setBold(sourceCell.getCellStyle().getFont().getBold());
+		font.setBoldweight(sourceCell.getCellStyle().getFont().getBoldweight());
+		//font.setCharSet(sourceCell.getCellStyle().getFont().getCharSet());
+		font.setFamily(sourceCell.getCellStyle().getFont().getFamily());
+		font.setFontHeight(sourceCell.getCellStyle().getFont().getFontHeight());
+		font.setFontHeightInPoints(sourceCell.getCellStyle().getFont().getFontHeightInPoints());
+		font.setFontName(sourceCell.getCellStyle().getFont().getFontName());
+		font.setItalic(sourceCell.getCellStyle().getFont().getItalic());
+		font.setStrikeout(sourceCell.getCellStyle().getFont().getStrikeout());
+		//font.setThemeColor(sourceCell.getCellStyle().getFont().getThemeColor());
+		font.setTypeOffset(sourceCell.getCellStyle().getFont().getTypeOffset());
+		font.setUnderline(sourceCell.getCellStyle().getFont().getUnderline());
+		tempStyle.setFont(font);
+		
+		//其他
+   		tempStyle.setAlignment( sourceCell.getCellStyle().getAlignment());
+   		tempStyle.setVerticalAlignment(sourceCell.getCellStyle().getVerticalAlignment());
+   		tempStyle.setBorderBottom(sourceCell.getCellStyle().getBorderBottom());
+   		tempStyle.setBorderLeft(sourceCell.getCellStyle().getBorderLeft());
+   		tempStyle.setBorderRight(sourceCell.getCellStyle().getBorderRight());
+   		tempStyle.setBorderTop(sourceCell.getCellStyle().getBorderTop());
+   		tempStyle.setBottomBorderColor(sourceCell.getCellStyle().getBottomBorderXSSFColor());
+   		tempStyle.setLeftBorderColor(sourceCell.getCellStyle().getLeftBorderXSSFColor());
+   		tempStyle.setRightBorderColor(sourceCell.getCellStyle().getRightBorderXSSFColor());
+   		tempStyle.setTopBorderColor(sourceCell.getCellStyle().getTopBorderXSSFColor());
+
+   	    tempStyle.setFillBackgroundColor(sourceCell.getCellStyle().getFillBackgroundColorColor());
+   		tempStyle.setFillForegroundColor(sourceCell.getCellStyle().getFillForegroundColorColor());
+   		tempStyle.setFillPattern(sourceCell.getCellStyle().getFillPattern());
+   		tempStyle.setRotation(sourceCell.getCellStyle().getRotation());
+   		tempStyle.setHidden(sourceCell.getCellStyle().getHidden());
+   		tempStyle.setWrapText(sourceCell.getCellStyle().getWrapText());
+   		tempStyle.setIndention(sourceCell.getCellStyle().getIndention());
+   		tempStyle.setLocked(sourceCell.getCellStyle().getLocked());
+
+   		return tempStyle;
+		
+	}
+}

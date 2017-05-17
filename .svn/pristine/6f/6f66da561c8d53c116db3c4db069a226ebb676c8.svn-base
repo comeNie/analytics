@@ -1,0 +1,246 @@
+define(function(require, exports, module) {
+	var model = require("./model");
+	var view = Backbone.View.extend({
+		el : "div .ajaxContent",
+		initialize : function() {
+			this.model = new model();
+		},
+		events : {
+			"click #reportId" : "showDetailDialog",//指标说明
+			"click #storeId" : "addToStore",//添加收藏
+			"click #cancelStore" : "cancelStore",//取消收藏
+			"click #analysisId" : "analysis",
+			"click #detailQueryId" : "detailQuery"
+		},
+		render : function() {
+			/**
+			 * 控制"多维分析"和"明细查询"两个按钮的显示与隐藏
+			 * @author wangxy 
+			 * @date 20150714
+			 */
+			this.initAnalysisAndDetailQuery();
+			/**
+			 * "添加/取消收藏"功能,及其显示与隐藏
+			 * @modify by wangxy
+			 * @date 20150714
+			 */
+			this.initIfStore();
+		},
+		initIfStore: function(){
+			$.ajax({
+				type : "POST",
+				url : $$ctx + "/reportShows/findIfStore",
+				data : {
+					functionId : $("#functionId").val()// 报表id
+				},
+				dataType : "json",
+				success : function(result) {
+					if(result.success){
+						$("#countStore").val(result.data);
+						var href = document.location.href;
+						$("#storeId").attr("style","display:none!important");
+						$("#cancelStore").attr("style","display: !important");
+					}else{
+						$("#storeId").attr("style","display: !important");
+						$("#cancelStore").attr("style","display:none !important");
+					}
+				}
+			});
+		},
+		initAnalysisAndDetailQuery :function(){
+			var analysisUrl = $('#analysisUrl').val();
+			var queryUrl = $('#queryUrl').val();
+			if(analysisUrl==''){
+				$("#analysisId").attr("style","display:none !important");
+			}else{
+				$("#analysisId").attr("style","display: !important");
+				$("#buttonGroup").attr("style","margin-left:13%");
+			}
+			if(queryUrl==''){
+				$("#detailQueryId").attr("style","display:none !important");
+			}else{
+				$("#detailQueryId").attr("style","display: !important");
+				$("#buttonGroup").attr("style","margin-left:13%");
+			}
+		},
+		analysis :function(){
+			var userName = $("#userNameOfCognos").val();
+			var password = $("#pswOfCognos").val();
+			var analysisUrl = $('#analysisUrl').val();
+			var url = "http://23.4.160.32/ibmcognos/cgi-bin/cognos.cgi" +
+					"?b_action=xts.run&m=portal/launch.xts&ui.gateway=%2fibmcognos%2fcgi-bin%2fcognos.cgi" +
+					"&ui.tool=AnalysisStudio&ui.action=edit&launch.openJSStudioInFrame=true" +
+					"&CAMUsername="+ userName + "&CAMPassword=" + password +
+					"&CAMNamespace=unirpt&ui.object=" + analysisUrl;
+			this.open(url);
+		},
+		detailQuery :function(){
+			var userName = $("#userNameOfCognos").val();
+			var password = $("#pswOfCognos").val();
+			var queryUrl = $('#queryUrl').val();
+			var url = "http://23.4.160.32:80/ibmcognos/cgi-bin/cognos.cgi" +
+			"?b_action=xts.run&m=portal/launch.xts&ui.gateway=%2fibmcognos%2fcgi-bin%2fcognos.cgi" +
+			"&ui.tool=QueryStudio&ui.action=edit" +
+			"&CAMUsername="+ userName + "&CAMPassword=" + password +
+			"&CAMNamespace=unirpt&ui.object=" + queryUrl;
+			this.open(url);
+		},
+		addToStore :function(){
+			$.ajax({
+				type : "POST",
+				url : $$ctx + "/reportShows/findCountStore",
+				dataType : "json",
+				success : function(result) {
+					if(result.success){
+						$("#countStore").val(result.data);
+						var count = $("#countStore").val();
+						if(count < 10){
+							$.ajax({
+								type: "post",
+								url:$$ctx+"/reportShows/addToStore",
+								data:{
+									functionId : $("#functionId").val()
+								},
+								success :function(result){
+									if(result.success){
+										$("#storeId").attr("style","display:none!important");
+										$("#cancelStore").attr("style","display: !important");
+										//window.opener.location.href=window.opener.location.href;
+										//window.opener.location.reload(); 
+										window.location.reload();
+									}else{
+										$("#storeId").attr("style","display: !important");
+										$("#cancelStore").attr("style","display:none !important");
+									}
+								}
+							});
+						}else{
+							alert("最多可收藏10个");
+						}
+					}
+				}
+			});
+		},
+		cancelStore :function(){
+			$.ajax({
+				type: "post",
+				url:$$ctx+"/reportShows/cancelStore",
+				data:{
+					functionId : $("#functionId").val()
+				},
+				success :function(result){
+					if(result.success){
+						var countStore = $("#countStore").val();
+						$("#storeId").attr("style","display: !important");
+						$("#cancelStore").attr("style","display:none !important");
+						var href = document.location.href;
+						if(href.indexOf("/store") != -1){
+							if(countStore == 1){
+								window.location="http://"+window.location.host+"/analytics/main#dashboard";
+								window.location.reload();
+							}else{
+								$.ajax({
+									type:"post",
+									url :$$ctx+"/reportShows/findStores",
+									success :function(result){
+										if(result.success){
+											var store = result.data[0];
+											window.location = "http://"+window.location.host+"/analytics/main#bizReport/store?type="+store.actionType+"&functionId="+store.functionId;
+											window.location.reload();
+										}
+									}
+								});
+							}
+						}else{
+							window.location.reload();
+						}
+					}else{
+						$("#storeId").attr("style","display:none!important");
+						$("#cancelStore").attr("style","display: !important");
+					}
+				}
+			});
+		},
+		showDetailDialog : function(e) {
+			$("#index-tbl tbody").html("");
+			$("#scrollId").scrollTop = 0;
+			$.ajax({
+				type : "POST",
+				url : $$ctx + "/reportShows/findReportShows2",
+				data : {
+					functionId : $("#functionId").val()
+				// 报表id
+				},
+				dataType : "json",
+				success : function(result) {
+					$("#indexShows").html(result.data.indexShows);
+				}
+			});
+			$.ajax({
+				type:"post",
+				url : $$ctx + "/reportShows/findReportByFunctionId",
+				data : {
+					functionId : $("#functionId").val()
+				},
+				success:function(result){
+					var arr = result.data;
+					if(arr.length <= 0){
+						$("#index-tbl tbody").append("<tr><td colspan='3'>"+"没有符合条件的记录"+"</td></tr>");
+					}else{
+						for(var i=0; i<arr.length; i++){
+							var j= i+1;
+							$("#index-tbl tbody").append("<tr><td>"+j+"</td><td>"+arr[i][0]+"</td><td>"+arr[i][1]+"</td></tr>");
+						}
+					}
+				}
+			});
+			$("#reportDetail").modal("show");
+		},
+		initReportDatatables : function() {
+			var viewSelf = this;
+			$.ajax({
+				type:"post",
+				url : $$ctx + "/reportShows/findIndexByFunctionId",
+				data : {
+					functionId : $("#functionId").val()
+				},
+				success:function(result){
+					var arr = result.data;
+					for(var i=0; i<arr.length; i++){
+						$("#index-tbl tbody").append("<tr><td>"+i+1+"</td><td>"+arr[0][0]+"</td><td>"+arr[0][1]+"</td></tr>");
+					}
+				}
+			});
+			/*var rdt = $("#index-tbl").dataTable({
+				bAutoWidth : false,
+				pagingType : "full_numbers",
+				paging:false,
+				searching : false, // 初始化表格
+				ordering : false,
+				ajax : {
+					type : "POST",
+					url : $$ctx + "/reportShows/findIndexByFunctionId",
+					data : {
+						functionId : $("#functionId").val()
+					}
+				},
+				columns : [ {
+					data : null
+				}, {
+					data : "indexNameStr"
+				}, {
+					data : "indexMeaningStr"
+				} ],
+				fnCreatedRow : function(nRow, aData, iDataIndex) {
+					$('td:eq(0)', nRow).html(iDataIndex + 1);
+				}
+			});
+			viewSelf.rdt = rdt;*/
+		},
+		open:function(url){
+			//console.log(url);
+			window.open(url,"newwindow","height=600,width=1200,top=50,left=50,toolbar=no,menubar=no,scrollbars=yes, resizable=yes,location=no, status=no");
+		}
+	});
+	module.exports = view;
+})

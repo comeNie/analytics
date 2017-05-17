@@ -1,0 +1,106 @@
+jdbc.driverClassName=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+
+#h2 database settings
+#jdbc.url=jdbc:log4jdbc:h2:file:~/.h2/sample;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+#jdbc.username=sa
+#jdbc.password=
+
+#mysql database setting
+#jdbc.url=jdbc:log4jdbc:mysql://localhost/sample?useUnicode=true&characterEncoding=utf-8
+#jdbc.username=root
+#jdbc.password=root
+
+#oracle database settings
+jdbc.url=jdbc:log4jdbc:oracle:thin:@10.1.32.126:1521:orcl
+jdbc.username=cognos_data
+jdbc.password=cognos_data
+
+#jdbc.url=jdbc:log4jdbc:oracle:thin:@10.1.32.39:1521:xddb1
+#jdbc.username=cog_data
+#jdbc.password=cog_data
+
+#oracle database settings
+#jdbc.url=jdbc:log4jdbc:oracle:thin:@23.4.160.33:1521:orcl
+#jdbc.username=cog_data
+#jdbc.password=cog_data
+
+#connection pool settings
+jdbc.pool.initialSize=1
+jdbc.pool.minIdle=1
+jdbc.pool.maxActive=20
+jdbc.pool.maxWait=60000
+jdbc.pool.timeBetweenEvictionRunsMillis=60000
+jdbc.pool.minEvictableIdleTimeMillis=300000
+jdbc.pool.poolPreparedStatements=true
+jdbc.pool.maxPoolPreparedStatementPerConnectionSize=20
+
+#host settings
+#ac.host=http://10.1.32.37:7001
+#local.host=http://10.1.32.38:7001
+#portal.url=http://10.1.32.37:7001/portal
+
+#ac.host=http://23.4.160.40:7001
+#local.host=http://23.4.160.37:7001
+#portal.url=http://23.4.160.40:7001/portal
+
+#ac.host=http://localhost:8080
+#local.host=http://localhost:8080
+#portal.url=http://localhost:8080/portal
+
+ac.host=http://172.16.49.243:7001
+local.host=http://localhost:8080
+portal.url=http://172.16.49.243:7001/portal
+
+#shiro-cas settings
+shiro.loginUrl=${cas.casServerUrlPrefix}?service=${cas.casService}
+shiro.successUrl=/main
+cas.casServerUrlPrefix=${ac.host}/ac
+cas.casService=${local.host}/analytics/cas
+#shiro-cas portalJump true\uff1aWe must jump portal; false:Can the subsystem jumps
+
+shiro.portalJump=false
+
+
+
+
+#######################
+# \u7cfb\u7edf
+#######################
+#sys.dbTjSchema=cog_data
+#historyReport(\u5b58\u653e\u8def\u5f84)
+#sys.historyReportPath=D\:\\opt\\uploads\\historyReport
+#sys.tempReportPath=D:\\opt\\uploads\\historyReport
+
+sys.historyReportPath=/uploads/analytics/historyReport
+sys.tempReportPath=/uploads/analytics/tempReport
+sys.tempImagePath=/uploads/analytics/tempImage
+sys.templatePath=/uploads/analytics/templatePath
+sys.wordPath=/uploads/analytics/wordPath
+sys.mobilePath=/uploads/analytics/mobile
+sys.updateDatas=/uploads/analytics/updateDatas
+sys.dataSubmit=/uploads/analytics/dataSubmit
+
+#243
+#sys.historyReportPath=weblogic/uploads/historyReport
+#sys.tempReportPath=weblogic/uploads/tempReport
+
+
+#######################
+# \u76ee\u5f55
+#######################
+cognos.serverHost=23.4.160.32
+cognos.serverPort=9300
+cognos.userName=admin
+cognos.userPassword=admin1234!
+#cognos.userNamespace=unirpt
+
+
+# default open = on if open = off is close
+quartz.clusterOpen=close
+# default open = on if open = off is close
+quartz.open=on
+#quartz.executeMachineName=172.16.49.102
+#quartz.executeMachineName=10.1.32.38
+quartz.executeMachineName=172.16.49.221
+#quartz.executeMachineName=172.16.49.243
+#quartz.executeMachineName=23.4.160.37

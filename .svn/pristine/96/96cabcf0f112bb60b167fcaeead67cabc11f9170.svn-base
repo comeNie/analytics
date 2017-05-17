@@ -1,0 +1,109 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
+<%@include file="../commons/res/taglibs.jsp"%>
+
+<style>
+small {
+	font-family: "Microsoft YaHei";
+}
+</style>
+<div class="ajax-content">
+	<div class="page-header">
+		<h1>
+			分析报告 <small> <i class="ace-icon fa fa-angle-double-right"></i>报告管理</small>
+		</h1>
+	</div>
+	<div class="row">
+		<div class="col-xs-12">
+			<div class="row">
+				<div class="col-xs-12">
+					<form class="form-horizontal" role="form">
+						<div class="form-group">
+							<label class="col-sm-3 control-label no-padding-right" for="form-field-1">创建开始日期：</label> 
+							<span class="input-icon input-icon-right"> 
+								<input id="begin-time" type="text" readonly="readonly" placeholder="请选择创建开始日期" value="${beginTime}"> 
+								<i class="ace-icon fa fa-calendar"></i>
+							</span>
+						</div>
+						<div class="form-group">
+							<label class="col-sm-3 control-label no-padding-right" for="form-field-1">创建截止日期：</label> 
+							<span class="input-icon input-icon-right"> 
+								<input id="end-time" type="text" placeholder="请选择创建截止日期" value="" readonly="readonly">
+								<i class="ace-icon fa fa-calendar"></i>
+							</span>
+						</div>
+						<div class="form-group">
+							<label class="col-sm-3 control-label no-padding-right" for="form-field-1">报表名称：</label> 
+							<input type="text" id="report-name" name="reportName" value="" style="width: 185px" />
+						</div>
+						<div class="form-group">
+							<label class="col-sm-3 control-label no-padding-right" for="form-field-1">创建人：</label> 
+							<input type="text" id="submitPerson" name="submitPerson" value="" style="width: 185px" />
+						</div>
+						<div class="clearfix form-actions">
+							<div class="col-md-offset-3 col-md-9">
+								<button type="button" id="btn-search" class="btn btn-sm btn-purple">
+									<i class="glyphicon glyphicon-search"> 查询</i>
+								</button>
+								&nbsp; &nbsp; &nbsp;
+								<button type="reset" role="reset" class="btn btn-sm">
+									<i class="ace-icon fa fa-undo bigger-110"> 重置 </i>
+								</button>
+								<button type="button" id="btn-create" role="create" class="btn btn-success btn-sm" style="float: right;">
+									<i class="glyphicon glyphicon-plus">创建报告 </i>
+								</button>
+								<input type="hidden" id="loginName" name="loginName" value="${loginName}">
+							</div>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-xs-12">
+					<div class="row">
+						<div class="col-xs-12">
+							<table id="tbl" class="table table-striped table-bordered table-hover">
+								<thead>
+									<tr>
+										<th>序号</th>
+										<th>报表名称</th>
+										<th>摘要</th>
+										<th>创建人</th>
+										<th>创建日期</th>
+										<th>创建人机构</th>
+										<th>所属机构</th>
+										<!-- <th id="operate">操作</th> -->
+									</tr>
+								</thead>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<script src="${res}/js/date-time/bootstrap-datepicker.min.js"></script>
+<script src="${res}/js/date-time/bootstrap-datepicker-cn.js"></script>
+<script src="${res}/js/date-time/bootstrap-timepicker.min.js"></script>
+<script src="${res}/js/date-time/daterangepicker.min.js"></script>
+<script type="text/javascript">
+	ace.load_ajax_scripts([], function() {
+	});
+	seajs.use("${my}/js/mobileReportMng/main/main", function(main) {
+		$("#begin-time").datepicker({
+			minView : "month", //选择日期后，不会再跳转去选择时分秒 
+			format : "yyyy-mm-dd", //选择日期后，文本框显示的日期格式 
+			language : 'zh-CN', //汉化 
+			autoclose : true
+		//选择日期后自动关闭 
+		});
+		$("#end-time").datepicker({
+			minView : "month", //选择日期后，不会再跳转去选择时分秒 
+			format : "yyyy-mm-dd", //选择日期后，文本框显示的日期格式 
+			language : 'zh-CN', //汉化 
+			autoclose : true
+		//选择日期后自动关闭 
+		});
+		main.init();
+	});
+</script>

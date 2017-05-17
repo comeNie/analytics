@@ -1,0 +1,342 @@
+package com.orienttech.statics.web.controller.reportIndexShows;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.google.common.base.Function;
+import com.google.common.collect.Lists;
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.dao.entity.indexshows.Favorite;
+import com.orienttech.statics.dao.entity.indexshows.Index;
+import com.orienttech.statics.dao.entity.indexshows.IndexFunction;
+import com.orienttech.statics.dao.entity.indexshows.PrivFunction;
+import com.orienttech.statics.dao.reportShows.FavoriteDao;
+import com.orienttech.statics.dao.reportShows.ReportShowsDao;
+import com.orienttech.statics.service.model.reportAndIndex.ReportIndex;
+import com.orienttech.statics.service.reportShows.ReportShowsService;
+
+@Controller
+@RequestMapping("/reportShows")
+public class ReportShowsController extends BaseController {
+
+	@Autowired
+	private ReportShowsService reportShowsService;
+	
+	@Autowired
+	private ReportShowsDao reportShowsDao;
+	
+	@Autowired
+	private FavoriteDao favoriteDao;
+
+	/**
+	 * 跳转到报表说明维护页面
+	 */
+	@RequestMapping
+	public String index() {
+		return "/reportMaintenance/reportMaintenance";
+	}
+	
+	/**
+	 * 查询收藏的报表
+	 */
+	@RequestMapping(value = "/findStores", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findStores(){
+		SessionUser user = getSessionUser();
+		List<PrivFunction> funlist = new ArrayList<PrivFunction>();
+		List<Object[]> flist = favoriteDao.findStores(user.getId().intValue());
+		for(Object [] obj : flist){
+			PrivFunction pf = new PrivFunction();
+			pf.setFunctionId(Integer.parseInt(String.valueOf(obj[0])));
+			pf.setActionType(String.valueOf(obj[1]));
+			funlist.add(pf);
+		}
+		return success(funlist);
+	}
+	
+	/**
+	 * 查询是否已经收藏
+	 */
+	@RequestMapping(value = "/findIfStore", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findIfStore(int functionId){
+		SessionUser user = getSessionUser();
+		int count = favoriteDao.findIfStore(functionId, user.getId().intValue());
+		int countStore = favoriteDao.findCountStore(user.getId().intValue());
+		if(count>0){
+			return success(countStore);
+		}else{
+			return failure();
+		}
+	}
+	
+	/**
+	 * 查询收藏的报表的个数
+	 */
+	@RequestMapping(value = "/findCountStore", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findCountStore(){
+		SessionUser user = getSessionUser();
+		int countStore = favoriteDao.findCountStore(user.getId().intValue());
+		return success(countStore);
+	}
+	
+	/**
+	 * 添加到收藏夹
+	 */
+	@RequestMapping(value = "/addToStore", method = RequestMethod.POST)
+	@ResponseBody
+	public Result addToStore(int functionId){
+		SessionUser user = getSessionUser();
+		Favorite favorite = new Favorite();
+		favorite.setFunctionId(functionId);
+		favorite.setUserId(user.getId().intValue());
+		favoriteDao.save(favorite);
+		return success();
+	}
+	
+	/**
+	 * 取消收藏
+	 */
+	@RequestMapping(value = "/cancelStore", method = RequestMethod.POST)
+	@ResponseBody
+	public Result cancelStore(int functionId){
+		reportShowsService.cancelStore(functionId);
+		return success();
+	}
+	
+	/**
+	 * 查找是否已被其他用户添加，如果已经添加，则提示重新刷新页面，获取最新数据
+	 */
+	@RequestMapping(value = "/findHavenSave", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findHavenSave(String indexId, int functionId){
+		String []str = indexId.split(",");
+		int k = 0;
+		Result result = null;
+		for(int i=0; i<str.length; i++,k++){
+			int id = Integer.parseInt(str[i]);
+			if(StringUtils.isNotBlank(reportShowsDao.findHavenSave(id, functionId))){
+				result = success(reportShowsDao.findHavenSave(id, functionId));
+				break;
+			}
+		}
+		if(k == str.length){
+			result = failure();
+		}
+		return result;
+	}
+	
+	/**
+	 * 为报表增加指标
+	 */
+	@RequestMapping(value = "/saveIndexIntoRelation", method = RequestMethod.POST)
+	@ResponseBody
+	public Result saveIndexIntoRelation(String indexId, int functionId, int rowNumber, int afterOrBefore){
+		String []str = indexId.split(",");
+		Arrays.sort(str);
+		int row2 = 0;
+		if(afterOrBefore == 1){
+			List<Object[]> ilist = reportShowsDao.findIdByRownumber(functionId, rowNumber);
+			if(ilist.size() == 0 && rowNumber == 0){
+				row2 = rowNumber+1;
+			}else{
+				row2 = rowNumber;
+			}
+			for(Object[] obj : ilist){
+				int number = Integer.parseInt(obj[1].toString())+str.length;
+				reportShowsService.execute(number,Integer.parseInt(obj[0].toString()));
+			}
+			for(int i=0; i<str.length; i++){
+				IndexFunction ifr = new IndexFunction();
+				ifr.setIndexId(Integer.parseInt(str[i]));
+				ifr.setFunctionId(functionId);
+				ifr.setRowNumber(++rowNumber);
+				reportShowsDao.save(ifr);
+			}
+		}else if(afterOrBefore == 0){
+			List<Object[]> alist = reportShowsDao.findAllByFunctionId(functionId);
+			int rowNumber3 = 0;
+			if(alist.size() > 0){
+				rowNumber3 = Integer.parseInt(alist.get(0)[1].toString());
+			}
+			//查出所有已经添加的指标，如果最小的行数和传过来的值不相等，即选择的不是第一个，那么就按照往此行上一行的后面添加
+			if(rowNumber != rowNumber3){
+				row2 = rowNumber+str.length;
+				int rowNumber2 = rowNumber-1;
+				List<Object[]> ilist = reportShowsDao.findIdByRownumber(functionId, rowNumber2);
+				for(Object[] obj : ilist){
+					int number = Integer.parseInt(obj[1].toString())+str.length;
+					reportShowsService.execute(number,Integer.parseInt(obj[0].toString()));
+				}
+				for(int i=0; i<str.length; i++){
+					IndexFunction ifr = new IndexFunction();
+					ifr.setIndexId(Integer.parseInt(str[i]));
+					ifr.setFunctionId(functionId);
+					ifr.setRowNumber(++rowNumber2);
+					reportShowsDao.save(ifr);
+				}//如果没值或者选择的是第一个，则执行这个方法体
+			}else if(rowNumber == rowNumber3){
+				if(rowNumber == 0){
+					row2 = 1;
+				}else{
+					row2 = rowNumber+str.length;
+				}
+				for(Object[] obj : alist){
+					int number = Integer.parseInt(obj[1].toString())+str.length;
+					reportShowsService.execute(number,Integer.parseInt(obj[0].toString()));
+				}
+				for(int i=0; i<str.length; i++){
+					IndexFunction ifr = new IndexFunction();
+					ifr.setIndexId(Integer.parseInt(str[i]));
+					ifr.setFunctionId(functionId);
+					if(rowNumber == 0){
+						ifr.setRowNumber(++rowNumber3);
+					}else{
+						ifr.setRowNumber(rowNumber3++);
+					}
+					reportShowsDao.save(ifr);
+				}
+			}
+		}
+		return success(row2);
+	}
+	
+	/**
+	 * 修改报表说明你
+	 */
+	@RequestMapping(value = "/updatePirvFunction", method = RequestMethod.POST)
+	@ResponseBody
+	public Result updatePirvFunction(String indexShows, int functionId){
+		reportShowsService.updatePirvFunction(indexShows, functionId);
+		return success();
+	}
+	/**
+	 * 报表说明维护，为报表添加指标
+	 */
+
+	@RequestMapping(value = "/deleteIndexFunctionById", method = RequestMethod.POST)
+	@ResponseBody
+	public Result deleteIndexFunctionById(int id){
+		reportShowsService.deleteIndexFunctionById(id);
+		return success();
+	}
+	
+	/**
+	 * 报表说明维护，为报表添加指标
+	 */
+
+	@RequestMapping(value = "/findIndexForReport", method = RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage findIndexForReport(Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize, int functionId, String indexCode, String indexName) {
+		Page<Object[]> page = reportShowsService.findIndexForReport(
+				firstIndex / pageSize, pageSize, functionId, indexCode, indexName);
+		DataTablesPage dtPage=new DataTablesPage(draw, page);
+		dtPage.setData(Lists.transform(page.getContent(), new Function<Object[], Index>() {
+			@Override
+			public Index apply(Object[] objs) {
+				Index index =new Index(objs);
+				return index;
+			}
+		}));
+		
+		return dtPage;
+	}
+
+	/**
+	 * 
+	 * 查看报表说明
+	 */
+	@RequestMapping(value = "/findReportShows2", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findReportShows2(int functionId) {
+		PrivFunction privFunction = new PrivFunction();
+		String str = reportShowsService.findReportShowsByFunctionId(functionId);
+		if(str!=null && !"".equals(str) && str.contains("\n")){
+			privFunction.setIndexShows(str.replace("\n","<br/>"));
+		}else{
+			privFunction.setIndexShows(str);
+		}
+		return success(privFunction);
+	}
+	
+	/**
+	 * 
+	 * 查看报表说明
+	 */
+	@RequestMapping(value = "/findReportShows", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findReportShows(int functionId) {
+		List<Object[]> alist = reportShowsDao.findAllByFunctionId(functionId);
+		PrivFunction privFunction = new PrivFunction();
+		privFunction.setIndexShows((reportShowsService
+				.findReportShowsByFunctionId(functionId)));
+		int rowNumber3 = 0;
+		if(alist.size() > 0){
+			rowNumber3 = Integer.parseInt(alist.get(0)[1].toString());
+		}else{
+			rowNumber3 = 1;
+		}
+		privFunction.setLevels(rowNumber3);
+		return success(privFunction);
+	}
+
+	/**
+	 * 查询指标被那些报表引用
+	 */
+	@RequestMapping(value = "/findIndexByFunctionId", method = RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage findIndexByFunctionId(Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize, int functionId) {
+		Page<Object[]> page = reportShowsService.findIndexByFunctionId(
+				firstIndex / pageSize, pageSize, functionId);
+		DataTablesPage dtPage=new DataTablesPage(draw, page);
+		dtPage.setData(Lists.transform(page.getContent(), new Function<Object[], ReportIndex>() {
+			@Override
+			public ReportIndex apply(Object[] objs) {
+				ReportIndex reportIndex =new ReportIndex(objs);
+				return reportIndex;
+			}
+		}));
+		return dtPage;
+	}
+	
+	/**
+	 * 查询指标被那些报表引用
+	 */
+	@RequestMapping(value = "/findReportByFunctionId", method = RequestMethod.POST)
+	@ResponseBody
+	public Result findReportByFunctionId(int functionId) {
+		List<Object[]> page = reportShowsService.findReportByFunctionId(functionId);
+		for(Object[] obj : page){
+			for(int i=0; i<obj.length; i++){
+				String str = obj[i].toString();
+				if(str.contains(">")){
+					str = str.replace(">", "&gt;");
+				}
+				if(str.contains("<")){
+					str = str.replace("<", "&lt;");
+				}
+				obj[i] = str;
+			}
+		}
+		return success(page);
+	}
+}

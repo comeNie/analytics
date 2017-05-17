@@ -1,0 +1,175 @@
+package com.orienttech.statics.web.controller.mobileReportMng;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.shiro.SecurityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.dao.MobileMngDao;
+import com.orienttech.statics.dao.entity.mobile.MobileBriefReport;
+import com.orienttech.statics.service.mobileReportMng.MobileReportMngService;
+import com.orienttech.statics.service.model.usermng.OrgDeptBo;
+import com.orienttech.statics.service.usermng.OrgDeptService;
+
+@RequestMapping("/mobileReport")
+@Controller
+public class MobileReportMngController extends BaseController {
+	
+	@Autowired
+	private MobileReportMngService mobileReportMngService;
+	@Autowired
+	private OrgDeptService orgDeptService;
+	
+	@RequestMapping
+	public String index(Long functionId,Model model){
+		SessionUser sUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+		String loginName = sUser.getUserName();
+		
+		model.addAttribute("loginName", loginName);
+		
+		return "/mobileReportMng/mobileReportMng";
+	}
+	
+	@RequestMapping("/reportCreate")
+	public String createIndex(@RequestParam(defaultValue="")String type,Model model){
+		SessionUser sUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+		String loginName = sUser.getUserName();
+		List<OrgDeptBo> orgList = orgDeptService.findOrgDeptListByOrgId("00");//查询小贷公司
+		model.addAttribute("orgIds", orgList);
+		model.addAttribute("loginName", loginName);
+		return "/mobileReportMng/"+type;
+	}
+	
+	@RequestMapping(value="/saveDesc")
+	@ResponseBody
+	public Result saveDesc(Integer mobileId,String description){
+		
+		mobileReportMngService.modifyMobileDesc(description,mobileId);
+		
+		return success();
+	}
+	
+	@RequestMapping(value="/delReportById")
+	@ResponseBody
+	public Result delReportById(Integer id){
+		
+		mobileReportMngService.delReportById(id);
+		
+		return success();
+	}
+	
+	
+	
+	/**
+	 * TODO 保存数据
+	 * @param reportName
+	 * @param belongsOrgId
+	 * @param description
+	 * @param filePath
+	 * @return
+	 */
+	@RequestMapping("/saveReportData")
+	@ResponseBody
+	public Result saveReportData(@RequestParam("orgIds") String orgIds,
+			@RequestParam(value = "uploadFile", required = false) MultipartFile myfile,
+			String reportName,String description,String year,String month,String tenDays){
+		
+		SessionUser sUser = getSessionUser();
+		
+		tenDays = tenDays==null?"00":tenDays;
+		String busiDate = year + month + tenDays;
+		
+		MobileBriefReport mobile = new MobileBriefReport();
+		
+		mobile.setSubmitPerson(sUser.getLoginName());//提交人
+		mobile.setSubmitPersonName(sUser.getUserName());
+		mobile.setSubmitOrgId(sUser.getOrgCode());//提交人所在机构
+		
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+//		SimpleDateFormat sdf1 = new SimpleDateFormat("yyyy-MM");
+		String str = sdf.format(new Date());
+		Date date = null;
+		try {
+			date = sdf.parse(str);
+			mobile.setBusiDate(busiDate);//业务日期
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+		if(reportName.equals("1")){
+			mobile.setReportDesc("月度分析报告");
+		}
+		if(reportName.equals("2")){
+			mobile.setReportDesc("全辖月度通报分析");
+		}
+		if(reportName.equals("3")){
+			mobile.setReportDesc("旬度报告");
+		}
+		if(reportName.equals("4")){
+			mobile.setReportDesc("风险报告");
+		}
+		if(reportName.equals("5")){
+			mobile.setReportDesc("财务报告");
+		}
+		
+		mobile.setSubmitTime(date);//提交时间
+		mobile.setDescription(description);//摘要
+		mobile.setBelongsOrgId(orgIds);//查阅机构
+		mobile.setReportName(reportName);//报告类别
+		
+		mobileReportMngService.saveMobileReport(mobile,myfile);
+		return success();
+	}
+	
+	@RequestMapping(value="/queryReports",method=RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage queryReports(@RequestParam("start") Integer pageNumber,
+			@RequestParam("length") Integer pageSize, Integer sEcho,
+			String year, String month, String tenDays, String reportName,String submitPersonName) {
+		Page<Object[]> page = mobileReportMngService.queryMobileReport(pageNumber/pageSize + 1,pageSize,year,month,tenDays,reportName,submitPersonName);
+		List<Object[]> list = page.getContent();
+		for(Object[] ob : list){
+//			ob[3] = mobileReportMngService.queryUserNameByLoginName(ob[3]);
+			ob[1] = mobileReportMngService.queryOrgNameByOrgId(ob[1].toString());
+			ob[5] = mobileReportMngService.queryOrgNameByOrgId(ob[5].toString());
+		}
+		return new DataTablesPage(sEcho, page);
+	}
+	
+	/**
+	 * 加载组织机构
+	 * @return
+	 */
+	@RequestMapping("/loadOrgDepts")
+	@ResponseBody
+	public List<OrgDeptBo> loadOrgDeptsData(){
+		
+		List<OrgDeptBo> list = orgDeptService.findOrgDeptListByOrgId("00");//查询小贷公司
+		List<OrgDeptBo> nlist = new ArrayList<OrgDeptBo>();
+		nlist.add(new OrgDeptBo("10001","邦信惠融投资控股股份有限公司","邦惠本部"));//添加“总部”
+		OrgDeptBo bo = null;
+		for(OrgDeptBo org : list){
+			bo = new OrgDeptBo();
+			bo.setId(org.getId());
+			bo.setName(org.getName());
+			bo.setDesc(org.getDesc());
+			nlist.add(bo);
+		}
+		return nlist;
+	}
+}

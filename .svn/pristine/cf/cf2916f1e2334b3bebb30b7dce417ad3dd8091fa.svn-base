@@ -1,0 +1,163 @@
+package com.orienttech.statics.web.controller.submitDetailQuery;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Date;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.google.common.base.Function;
+import com.google.common.collect.Lists;
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.entity.submission.TblReportTemplate;
+import com.orienttech.statics.dao.entity.submission.TblTemplateSubmit;
+import com.orienttech.statics.dao.submission.TblReportTemplateDao;
+import com.orienttech.statics.dao.submission.TblTemplateSubmitDao;
+import com.orienttech.statics.service.model.submission.SubmitDetailVO;
+import com.orienttech.statics.service.report.impl.HistoryReportServiceImpl;
+import com.orienttech.statics.service.submitDetailQuery.SubmitDetailQueryService;
+
+@RequestMapping("/submitDetailQuery")
+@Controller
+public class SubmitDetailQueryController extends BaseController {
+	@Autowired
+	TblReportTemplateDao tblReportTemplateDao;
+	
+	@Autowired
+	TblReportTemplateDao dateSubmitQueryDao;
+
+	@Autowired
+	private TblTemplateSubmitDao submitDetailQueryDao;
+
+	@Autowired
+	private SubmitDetailQueryService submitDetailQueryService;
+
+	/**
+	 * 根据报表类型加载不同的页面
+	 * 
+	 * @param type
+	 *            JSP名称
+	 * @param model
+	 * @return
+	 */
+	@RequestMapping
+	public String index(@RequestParam(defaultValue = "") String type,
+			Model model) {
+
+		return "/submitDetailQuery/" + type;
+	}
+
+	@RequestMapping(value = "/findSubmitDetailList", method = RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage findSubmitDetailList(Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize, String sumState,
+			String startDateStr, String endDateStr, String name, String cycle) {
+		
+		Date startTime = CommonHelper.str2Date(startDateStr,CommonHelper.DF_DATE);
+		Date endTime = CommonHelper.str2Date(endDateStr, CommonHelper.DF_DATE);
+		
+		Page<Object[]> page = submitDetailQueryService.findSubmitDetailList(firstIndex / pageSize, pageSize, sumState, startTime, endTime,name, cycle);
+		DataTablesPage dtPage = new DataTablesPage(draw, page);
+		dtPage.setData(Lists.transform(page.getContent(),
+				new Function<Object[], SubmitDetailVO>() {
+					@Override
+					public SubmitDetailVO apply(Object[] objs) {
+						SubmitDetailVO submitDetailVO = new SubmitDetailVO(objs);
+						int submitedNumber = submitDetailQueryDao.countHavenSubmitNumberByTemplateId(submitDetailVO.getId(),submitDetailVO.getWorkflowId());
+						/*TblReportTemplate tblReportTemplate = dateSubmitQueryDao
+								.findReportTemplateById(submitDetailVO.getId());*/
+						int shouldSubmitNumber = submitDetailQueryDao.countShouldSubmitNumberByTemplateId(submitDetailVO.getId(),submitDetailVO.getWorkflowId());
+						submitDetailVO.setAccept(submitedNumber + "/" + shouldSubmitNumber);
+						return submitDetailVO;
+					}
+				}));
+
+		return dtPage;
+	}
+
+	@RequestMapping(value = "/findDetailList", method = RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage findDetailList(Integer draw,
+			@RequestParam("start") Integer firstIndex,
+			@RequestParam("length") Integer pageSize, int id,String workflowId) {
+		Page<Object[]> page = submitDetailQueryService.findDetailList(
+				firstIndex / pageSize, pageSize, id,workflowId);
+		DataTablesPage dtPage = new DataTablesPage(draw, page);
+		dtPage.setData(Lists.transform(page.getContent(),
+				new Function<Object[], TblTemplateSubmit>() {
+					@Override
+					public TblTemplateSubmit apply(Object[] objs) {
+						TblTemplateSubmit tblTemplateSubmit = new TblTemplateSubmit(objs);
+						String str=tblReportTemplateDao.findOrgNameById(tblTemplateSubmit.getOrgId());
+						tblTemplateSubmit.setOrgId(str);
+						return tblTemplateSubmit;
+					}
+				}));
+		return dtPage;
+	}
+	
+	/**
+	 * 下载
+	 * @param fileName
+	 * @param req
+	 * @param resp
+	 */
+	@RequestMapping(value = "/download")
+	@ResponseBody
+	public String download(String fileName,HttpServletRequest req,HttpServletResponse resp){
+		String filePath = System.getProperty("user.home") + PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+File.separator+fileName;
+		try {
+			File file=new File(filePath);
+			if(FileUtils.isExists(file)){
+				FileUtils.downloadFile(new File(filePath), fileName, req, resp);
+			}else{
+				return "文件不存在";
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return "";
+	}
+	
+	/**
+	 * 下载
+	 * @param fileName
+	 * @param req
+	 * @param resp
+	 */
+	@RequestMapping(value = "/fileIsExists")
+	@ResponseBody
+	public String fileIsExists(String fileName,HttpServletRequest req,HttpServletResponse resp){
+		if(StringUtils.isNotEmpty(fileName)){
+			String filePath = System.getProperty("user.home") + PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)+File.separator+fileName;
+			File file=new File(filePath);
+			if(FileUtils.isExists(file)){
+				return "";
+			}else{
+				return "文件不存在";
+			}
+		}else{
+			return "文件名不能为空";
+		}
+	}
+
+}

@@ -1,0 +1,26 @@
+package com.orienttech.statics.dao;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.PagingAndSortingRepository;
+
+import com.orienttech.statics.dao.entity.UserSso;
+
+public interface UserSsoDao extends PagingAndSortingRepository<UserSso, Long>,
+JpaSpecificationExecutor<UserSso>{
+	@Query("FROM UserSso us where us.ssoId=?1")
+	List<UserSso> findListBySsoId(String ssoId);
+	
+	@Modifying
+	@Query(value="update TB_USER_SSO u set u.role_id =?1 where u.sso_id =?2",nativeQuery=true)
+	void modifyUserSsoRole(String roleId,String ssoId);
+	
+	@Query("select u.roleId from UserSso u where u.ssoId=?1")
+	public String queryRoleBySsoId(String loginName);
+
+	@Query("select u.userName from UserSso u where u.ssoId=?1")
+	public String queryUserNameBySsoId(String loginName);
+}

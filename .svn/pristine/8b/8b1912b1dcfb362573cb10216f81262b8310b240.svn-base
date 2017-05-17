@@ -1,0 +1,553 @@
+define(function(require, exports, module) {
+	var model = require("./model");
+	var postStr = "";
+	var view = Backbone.View
+			.extend({
+				el : "div .ajaxContent",
+				initialize : function() {
+					this.model = new model();
+				},
+				events : {
+					"click button[role='query']":"formQuery",
+					"click button[role='reset']":"formReset",
+					"click #search1":"searchReport",
+					"click #reset1":"formReset1",
+					"click button[role='delete']" : "deleteIndexFunctionById",
+					"click #btn-addIndexExcute-submit" :"addIndexIntoRelation",
+					"click #btn-saveIndex-submit" : "updatePrivFunction",//保存
+					"click #btn-addIndex-submit" : "showAddIndexDialog",//添加指标
+					"click #showTree" : "ToggleTree"
+				},
+				render : function() {//TODO
+					$("#functionId").val(-1);
+					/*if($("#functionId").val() == -1){
+						$("#btn-saveIndex-submit").attr("disabled","disabled");
+						$("#btn-addIndex-submit").attr("disabled","disabled");
+					}*/
+					this.initReportShows();
+					this.initReportDatatables();
+					this.initAddIndexDatatables();
+					this.initTree();//报表说明维护加载报表列表
+					this.clickFunction();
+				},
+				/*initTree : function() {// 初始化权限
+					var viewSelf = this;
+					$.fn.zTree
+							.init(
+									$("#treeDemo"),
+									{
+										view : {
+											selectedMulti : false // 禁止多点选中
+										},
+										async : {
+											enable : true,
+											url : $$ctx
+													+ "/menuMng/findReportFirstMenuList"
+										},
+										data : {
+											simpleData : {
+												enable : true,
+												idKey : "id",
+												pIdKey : "pid"
+											},
+											key : {
+												name : "name"
+											}
+										},
+										callback : {
+											onClick : function(treeId, treeNode) {
+												var treeObj = $.fn.zTree.getZTreeObj(treeNode);
+												var selectedNode = treeObj.getSelectedNodes()[0];
+												$("#functionId").val(selectedNode.id);
+												var arr = $(".level2 .curSelectedNode");
+												var arr1 = $(".level2");
+												arr1.css("background-color","");
+												arr.css("background-color","yellow");
+												if(arr.length == 1){
+													$.ajax({
+														type:"post",
+														url:$$ctx
+														+ "/reportShows/findReportShows",
+														data:{
+															functionId : $("#functionId").val()
+														},
+														success : function(
+																result) {
+															if(result.success){
+																if(result.data != null){
+																	$("#indexShows").val(result.data.indexShows);
+																}else{
+																	$("#indexShows").val("无");
+																}
+															}
+														}
+													});
+																$("#index-tbl").dataTable().fnDestroy();
+																viewSelf.initReportDatatables();
+												}
+												var treeObj = $.fn.zTree.getZTreeObj("treeDemo");
+									             
+									            var treenode = treeObj.getNodeByParam("id", selectedNode.id, null);
+									            treeObj.expandNode(treenode, true, true, true);
+									            treeObj.selectNode(treenode);
+											}
+										}
+									});
+					if($("#functionId").val() == '110101'){
+						alert($("#functionId").val());
+						$("#treeDemo_3_a").attr("class","level2 curSelectedNode");
+					}
+				},*/
+				/**
+				 * 报表说明维护加载报表列表
+				 */
+				initTree : function() {
+					$.fn.zTree.init($("#tree"), {
+						view : {
+							selectedMulti : false // 禁止多点选中
+						},
+						async : {
+							enable : true,
+							url : $$ctx
+									+ "/menuMng/findReportFirstMenuList"
+						},
+						data : {
+							simpleData : {
+								enable : true,
+								idKey : "id",
+								pIdKey : "pid"
+							},
+							key : {
+								name : "name"
+							}
+						},
+		                check: {
+		                    enable: true,
+		                    chkStyle: "radio",
+		                    radioType: "all"
+		                },
+		                callback: {
+		                    onClick: function(event, treeId, treeNode) {
+		                    	if(treeNode!=null&&treeNode.children!=null&&treeNode.children.length!=null&&treeNode.children.length>0){
+		                    		return false;
+		                    	}else{
+		                    		var productCd = treeNode.id;
+		                        	var treeObj = $.fn.zTree.getZTreeObj(treeId);
+		                        	var node = treeObj.getNodeByParam("id", productCd, null);
+		                        	treeObj.checkNode(node, true, true);
+		                        	var parentNode = node.getParentNode();
+		                            treeObj.expandNode(parentNode, true, false);
+		                            $('#productCdMask').val(treeNode.name);
+		                            $("#functionId").val(treeNode.id);
+		                            $("#controlZTree").toggle(300,
+		                            function() {
+		                                if (($("#controlZTree").attr("style")) == "") {
+		                                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                                } else if (($("#controlZTree").attr("style")) == "display: none;") {
+		                                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                                } else {
+		                                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                                }
+		                            });
+		                    	}
+		                    },
+		                    onCheck: function(event, treeId, treeNode) {
+		                    	//$('#productType').val(treeNode.productCd);
+		                    	//$('#parentProductCd').val(treeNode.parentProductCd);
+		                    },
+		                    beforeCheck: function(treeId, treeNode) {
+		                        return ! treeNode.isParent;
+		                    },
+							onAsyncSuccess : function(event, treeId, treeNode, msg) {
+								var treeObj = $.fn.zTree.getZTreeObj(treeId);
+								//var productType = $("#productType").val();
+								//if (productType) {
+									var node = treeObj.getNodeByParam("id",
+											null, null);
+									treeObj.checkNode(node, true, true);
+									var parentNode = node.getParentNode();
+									treeObj.expandNode(parentNode, true, false);
+									$("#productCdMask").val(node.productName);
+								}
+							//}
+		                }
+		            });
+				},
+				ToggleTree : function() {//TODO
+					$("#controlZTree").toggle(300, function() {
+						if (($("#controlZTree").attr("style")) == "") {
+		                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                } else if (($("#controlZTree").attr("style")) == "display: none;") {
+		                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                } else {
+		                    $("#showTree")[0].innerHTML = "<i class='ace-icon fa fa-eye'></i>";
+		                }
+					});
+
+				},
+				showAddIndexDialog : function(e) {//展现指标添加div
+					if($("#functionId").val()=="-1"){
+						bootbox.alert("<span style='font-size:16px;'>请选择报表！</span>");
+					}else{
+						postStr="";
+						$("#indexExcute-tbl").dataTable().fnDestroy();
+						this.initAddIndexDatatables();
+						$("#addIndex").modal("show");
+					}
+				},
+				initReportShows :function(){
+					$.ajax({
+						type : "POST",
+						url : $$ctx + "/reportShows/findReportShows",
+						data : {
+							functionId : $("#functionId").val()
+						// 报表id
+						},
+						dataType : "json",
+						success : function(result) {
+							$("#indexShows").val(result.data.indexShows);
+							$("#rowNumber").val(result.data.levels);
+						}
+					});
+				},
+				initAddIndexDatatables : function(){
+					var viewSelf = this;
+					var indexdt = $("#indexExcute-tbl")
+							.dataTable(
+									{
+										bAutoWidth : false,
+										pagingType : "full_numbers",
+										searching : false, // 初始化表格
+										ordering : false,
+										ajax : {
+											type : "POST",
+											url : $$ctx+"/reportShows/findIndexForReport?functionId="+$("#functionId").val(),
+											data :
+												function(params) {
+												if(viewSelf.indexdt&&viewSelf.indexdt.oSearchData){//循环遍历查询条件
+													 for(var key in viewSelf.indexdt.oSearchData){
+														 params[key]=viewSelf.indexdt.oSearchData[key];
+											         }
+												}
+											},/*,{
+												functionId : $("#functionId").val(),
+												
+											}*/
+											complete :function (result){
+												if(result.success){
+														var array = postStr.split(",");
+														for (var i = 0; i < array.length; i++) {
+															$("#indexExcute-tbl tbody input[type='checkbox'][value='"+ array[i]+ "']")
+															.attr("checked","true");
+														}
+												}
+											}
+										},
+										columns : [
+												{
+													data : null,
+													render : function(data,
+															type, row) {
+														return Mustache.render($("#dt-index-operation").html(),
+																		{
+																			indexId : row.indexId
+																		});
+																		}
+												},
+												{
+													data : null,
+													render : function(data,
+															type, row) {
+														return Mustache.render($("#dt-row-operation").html());
+													}
+												},
+												{
+													data : "indexNameStr"
+												}, {
+													data : "indexMeaningStr"
+												}],
+										fnCreatedRow : function(nRow, aData,
+												iDataIndex) {
+											$('td:eq(1)', nRow).html(
+													iDataIndex + 1);
+										}
+									});
+					viewSelf.indexdt = indexdt;
+				},
+				initReportDatatables : function() {//TODO 初始化报表对应的指标
+					var viewSelf = this;
+					/*if($("#functionId").val() == -1){
+						$("#btn-saveIndex-submit").removeAttr("disabled");
+						$("#btn-addIndex-submit").removeAttr("disabled");
+					}else{
+						$("#btn-saveIndex-submit").attr("disabled","disabled");
+						$("#btn-addIndex-submit").attr("disabled","disabled");
+					}*/
+					var rdt = $("#index-tbl")
+							.dataTable(
+									{
+										bAutoWidth : false,
+										pagingType : "full_numbers",
+										searching : false, // 初始化表格
+										ordering : false,
+										ajax : {
+											type : "POST",
+											url : $$ctx
+													+ "/reportShows/findIndexByFunctionId",
+											data : {
+												functionId : $("#functionId").val()
+											},
+											complete:function(){
+												//alert($("#rowNumber").val());
+												if($("#rowNumber").val() != 0){
+													var number = $("#rowNumber").val();
+													$("input[type='radio'][name='check_indexSelected_id'][value='"+number+"']").attr("checked","checked");
+												}
+											}
+										},
+										columns : [
+												{
+													data : null,
+													render : function(data,
+															type, row) {
+														return Mustache
+																.render(
+																		$(
+																				"#dt-indexSelected-operation")
+																				.html(),
+																		{
+																			rowNumber : row.rowNumber
+																		});
+													}
+												},
+												{
+													data : null
+												}, {
+													data : "indexNameStr"
+												}, {
+													data : "indexMeaningStr"
+												} ,
+												{
+													data : null,
+													render : function(data,
+															type, row) {
+														return Mustache
+																.render(
+																		$(
+																				"#dt-row-operation")
+																				.html(),
+																		{
+																			id : row.id
+																		});
+													}
+												}],
+										fnCreatedRow : function(nRow, aData,
+												iDataIndex) {
+											$('td:eq(1)', nRow).html(
+													iDataIndex + 1);
+										}
+									});
+					viewSelf.rdt = rdt;
+				},
+				addIndexIntoRelation : function(){
+					var viewSelf = this;
+					var str ="";
+					var arrays = $("input:checkbox[name^='check']:checked");
+					if(arrays.length == 0){//如果一个指标都没选
+						bootbox.alert("<span style='font-size:16px;'>请选择指标！</span>");
+					}else{//循环保存
+						/*for(var i =0 ; i< arrays.length ; i++){
+							indexId= arrays[i].value;
+							str += indexId+",";
+						}*/
+						$.ajax({
+							type:"POST",
+							url:$$ctx + "/reportShows/findHavenSave",
+							data:{
+								indexId : postStr,//所选指标的id
+								functionId :$("#functionId").val()
+							},
+							success :function(result){
+								if(result.success){
+									var data = result.msg;
+									bootbox.alert("<span style='font-size:16px;'>名称为"+data+"的指标已被别的用户添加，请刷新页面</span>");
+									$("#addIndex").modal("hide");
+								}else{
+									if("undefined" == typeof($("input[type='radio'][name='check_indexSelected_id']:checked").val())){
+										$("#rowNumber").val(0);
+									}else{
+										$("#rowNumber").val($("input[type='radio'][name='check_indexSelected_id']:checked").val());
+									}
+									$.ajax({
+										type:"POST",
+										url:$$ctx + "/reportShows/saveIndexIntoRelation",
+										data:{
+											indexId : postStr,//所选指标的id
+											functionId :$("#functionId").val(),
+											rowNumber : $("#rowNumber").val(),
+											afterOrBefore:$("input[name='after'][type='radio']:checked").val()
+										},
+										dataType:"json",
+										success:function(result){
+											if(result.success ==true){
+												bootbox.alert("<span style='font-size:16px;'>指标添加成功！</span>");
+												$("#rowNumber").val(result.data);
+												$("#addIndex").modal("hide");
+												viewSelf.rdt.api().draw();
+											}else{
+												bootbox.alert("<span style='font-size:16px;'>指标添加失败！</span>");
+											}
+										}
+									});
+								}
+							}
+						});
+					}
+				},
+				deleteIndexFunctionById : function(e){
+					var viewSelf = this;
+					if(confirm("确定删除吗？")){
+						$.ajax({
+							type:"post",
+							url:$$ctx+"/reportShows/deleteIndexFunctionById",
+							data:{
+								id: e.currentTarget.value
+							},
+							success:function(result){
+								if(result.success){
+									bootbox.alert("<span style='font-size:16px;'>删除成功！</span>");
+										$.ajax({
+											type:"post",
+											url:$$ctx
+											+ "/reportShows/findReportShows",
+											data:{
+												functionId : $("#functionId").val()
+											},
+											success : function(
+													result) {
+												if(result.success){
+													$("#rowNumber").val(result.data.levels);
+													if(result.data != null){
+														$("#indexShows").val(result.data.indexShows);
+													}else{
+														$("#indexShows").val("无");
+													}
+												}
+											},
+											complete:function(){
+												$("#index-tbl").dataTable().fnDestroy();
+												viewSelf.initReportDatatables();
+											}
+										});
+									viewSelf.rdt.fnDraw();
+								}else{
+									bootbox.alert("<span style='font-size:16px;>删除失败！</span>");
+								}
+							}		
+						});
+					}
+			},
+			updatePrivFunction : function(){
+				if($("#functionId").val()=="-1"){
+					bootbox.alert("<span style='font-size:16px;'>请选择报表！</span>");
+				}else{
+					var length = $("#indexShows").val().length;
+					if(length <= 350){
+						$.ajax({
+							type:"post",
+							url:$$ctx+"/reportShows/updatePirvFunction",
+							data:{
+								indexShows: $("#indexShows").val(),
+								functionId :$("#functionId").val()
+							},
+							success:function(result){
+								if(result.success){
+									$.ajax({
+										type : "POST",
+										url : $$ctx + "/reportShows/findReportShows",
+										data : {
+											functionId : $("#functionId").val()
+											// 报表id
+										},
+										dataType : "json",
+										success : function(result) {
+											$("#indexShows").val(result.data.indexShows);
+										}
+									});
+									bootbox.alert("<span style='font-size:16px;'>报表说明保存成功！</span>");
+								}else{
+									bootbox.alert("<span style='font-size:16px;>报表说明保存失败！</span>");
+								}
+							}
+						});
+					}else{
+						bootbox.alert("<span style='font-size:16px;'>最多350个字！</span>");
+					}
+				}
+			},
+			formQuery:function(){//查询
+				var viewSelf = this;
+				var oSearchData={};
+				oSearchData.indexCode=$("#indexCode").val();
+				oSearchData.indexName=$("#indexName").val();
+				viewSelf.indexdt.oSearchData=oSearchData;//查询条件
+				viewSelf.indexdt.fnPageChange(0);
+			},
+			formReset:function(){//表单重置
+				var viewSelf = this;
+				viewSelf.indexdt.oSearchData=null;
+				viewSelf.indexdt.fnPageChange(0);
+			},
+			searchReport : function(){
+				var viewSelf = this;
+				$.ajax({
+					type:"post",
+					url:$$ctx
+					+ "/reportShows/findReportShows",
+					data:{
+						functionId : $("#functionId").val()
+					},
+					success : function(
+							result) {
+						if(result.success){
+							$("#rowNumber").val(result.data.levels);
+							if(result.data != null){
+								$("#indexShows").val(result.data.indexShows);
+							}else{
+								$("#indexShows").val("无");
+							}
+						}
+					},
+					complete:function(){
+						$("#index-tbl").dataTable().fnDestroy();
+						viewSelf.initReportDatatables();
+					}
+				});
+//				alert($("#functionId").val());
+			},
+			formReset1 : function(){
+				$("#productCdMask").val("");
+				$("#functionId").val(-1);
+				//$("#indexShows").val("");
+				//viewSelf.rdt.fnPageChange(0);
+			},
+			clickFunction: function () {
+	    		var self = this;
+	    		postStr = "";
+	    		$(document).on("change","#indexExcute-tbl tbody input[name='check_user_id']",function() {
+	    			if ($(this).prop("checked")) {
+	    				var str = $(this).val() + ",";
+	    				if (postStr.indexOf(str) == -1) {
+	    					postStr += str;
+	    				}
+	    			} else{
+	    				var str = $(this).val() + ",";
+	    				if (postStr.indexOf(str) != -1) {
+	    					postStr = postStr.replace(str, "");
+	    				}
+	    			}
+	    		});
+	    	}
+		});
+	module.exports = view;
+})

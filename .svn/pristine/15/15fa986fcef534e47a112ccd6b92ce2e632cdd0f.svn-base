@@ -1,0 +1,192 @@
+package com.orienttech.statics.service.usermng.impl;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.hibernate.annotations.common.util.StringHelper;
+import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+
+import com.orienttech.statics.commons.crypt.ICrypt;
+import com.orienttech.statics.commons.crypt.UnixCrypt;
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.dao.UserSsoDao;
+import com.orienttech.statics.dao.entity.UserSso;
+import com.orienttech.statics.service.model.usermng.UserBo;
+import com.orienttech.statics.service.usermng.UserMngService;
+
+@Service("userMngService")
+public class UserMngServiceImpl implements UserMngService {
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private UserSsoDao userSsoDao;
+
+	@Override
+	public UserBo findUserByUserName(String userName) {
+		StringBuffer strBuffer = new StringBuffer();
+		strBuffer
+				.append("select distinct  u.user_id,u.login_name,u.user_name,u.password,u.org_code ,")
+				.append(" u.role_id,eod.name eod_name,eod.description , r.name r_name")
+				.append(" from users u")
+				.append(" left join ec_org_department eod on u.org_code = eod.id")
+				.append(" left join role r on u.role_id = r.role_id")
+				.append(" where user_status='0' and u.login_name=?1");
+		List<Object[]> list = dynamicQuery.nativeQuery(strBuffer.toString(),
+				userName);
+		if (CollectionUtils.isEmpty(list)) {
+			return null;
+		}
+		return new UserBo(list.get(0));
+	}
+
+	@Override
+	public UserBo findUserOfLogin(String userName, String passwd) {
+		StringBuffer strBuffer = new StringBuffer();
+		strBuffer
+				.append("select distinct  u.user_id,u.login_name,u.user_name,u.password,u.org_code ,")
+				.append(" u.role_id,eod.description , r.name")
+				.append(" from users u")
+				.append(" left join ec_org_department eod on u.org_code = eod.id")
+				.append(" left join role r on u.role_id = r.role_id")
+				.append(" where user_status='0' and u.login_name=?1");
+		List<Object[]> list = dynamicQuery.nativeQuery(strBuffer.toString(),
+				userName);
+		if (CollectionUtils.isEmpty(list)) {
+			return null;
+		}
+		UserBo vo = new UserBo(list.get(0));
+		ICrypt uc = new UnixCrypt();
+		if (StringUtils.isNoneBlank(vo.getUserName())
+				&& StringUtils.isNotBlank(vo.getPassword())
+				&& uc.matches(vo.getPassword(), passwd)) {
+			return vo;
+		}
+		return vo;
+	}
+
+	@Override
+	public UserBo findUserBySsoId(String ssoId) {
+		StringBuffer strBuffer = new StringBuffer();
+		strBuffer
+				.append("select distinct  u.user_id,u.sso_id,u.user_name,u.password,u.org_code ,")
+				.append(" u.role_id,eod.name eod_name,eod.description, (select  to_char(wmsys.wm_concat(DISTINCT r.name)) from role r where instr(concat(',',concat(u.role_id,',')),concat(',',concat(to_char(r.role_id),',')))>0) r_name")
+				.append(" from tb_user_sso u")
+				.append(" left join ec_org_department eod on u.org_code = eod.id")
+				.append(" where user_status='0' and u.sso_id=?1 order by u.user_id");
+		List<Object[]> list = dynamicQuery.nativeQuery(strBuffer.toString(),
+				ssoId);
+		if (CollectionUtils.isEmpty(list)) {
+			return null;
+		}
+		return new UserBo(list.get(0));
+	}
+
+	@Override
+	@Transactional
+	public void saveUserSsoBySsoId(UserSso user) {
+		List<UserSso> list = userSsoDao.findListBySsoId(user.getLoginName());
+		UserSso db_user = null;
+		if (!CollectionUtils.isEmpty(list)) {
+			db_user = list.get(0);
+		}
+		if (db_user == null) {
+			db_user = new UserSso();
+			db_user.setLoginName(user.getLoginName());
+			db_user.setSsoId(user.getSsoId());
+			db_user.setRoleId("");
+		}
+		BeanUtils.copyProperties(user, db_user, "userId", "loginName", "ssoId",
+				"roleId");
+		userSsoDao.save(db_user);
+	}
+
+	@SuppressWarnings("unchecked")
+	@Transactional(readOnly = true)
+	@Override
+	public Page<UserSso> findAll(String search, Integer pageNumber,
+			Integer pageSize) {
+
+		StringBuffer strBuffer = new StringBuffer();
+//		strBuffer
+//				.append("select new UserSso(u.userId,u.ssoId,u.userName) from UserSso u,(select distinct orgId from StaDimOrg eod) sta,Role r");
+//		strBuffer
+//				.append(" where u.orgCode = sta.orgId and u.roleId = r.id and u.userStatus='0'");
+		strBuffer.append("select distinct u.user_id, u.sso_id, u.user_name from tb_user_sso u, (select distinct orgid from T_STA_DIM_ORG) sta,");
+		strBuffer.append("Role r where u.org_code = sta.orgid and instr(concat(',',concat(u.role_id,',')),concat(',',concat(to_char(r.role_id),',')))>0 and u.user_status = '0'");
+
+		int index = 1;
+		List<Object> params = new ArrayList<Object>();
+
+		if (StringUtils.isNotEmpty(search)) {
+			strBuffer.append(" and u.user_name like ?").append(index++);
+			params.add("%" + search + "%");
+		}
+		return dynamicQuery.nativeQuery(new PageRequest(
+				pageNumber - 1, pageSize), strBuffer.toString(), params
+				.toArray());
+
+	}
+
+	@Transactional
+	@Override
+	public boolean modifyUserRole(String roleId, String ssoId) {
+
+		int count = 0;
+		String[] sids = ssoId.split(",");
+		try {
+			if (StringHelper.isNotEmpty(ssoId)) {
+				for (int i = 0; i < sids.length; i++) {
+					userSsoDao.modifyUserSsoRole(roleId.substring(0, roleId.length()-1),
+							sids[i]);
+					count++;
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+
+		if (count == sids.length) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Page<Object[]> findUserSsoInfo(String search, Integer pageNumber,
+			Integer pageSize) {
+		StringBuffer strBuffer = new StringBuffer();
+		strBuffer
+				.append("select * from (select distinct t.sso_id ssoid, t.user_name user_name,d.name name,(select  to_char(wmsys.wm_concat(DISTINCT r.name)) from role r where instr(concat(',',concat(t.role_id,',')),concat(',',concat(to_char(r.role_id),',')))>0) rolename,t.role_id from TB_USER_SSO t left join t_sta_dim_org d ");
+		strBuffer.append("on t.org_code = d.orgid left join role r on 1=1) m");
+
+		int index = 1;
+		List<Object> params = new ArrayList<Object>();
+		if (StringUtils.isNotEmpty(search)) {
+			strBuffer.append(" where m.user_name like ?").append(index++);
+			params.add("%" + search + "%");
+			strBuffer.append(" or m.name like ?").append(index++);
+			params.add("%" + search + "%");
+			strBuffer.append(" or m.rolename like ?").append(index++);
+			params.add("%" + search + "%");
+			//strBuffer.append(" order by nlssort(m.user_name,'NLS_SORT=SCHINESE_PINYIN_M')");
+			
+			strBuffer.append(" order by m.ssoid desc");
+			return dynamicQuery.nativeQuery(new PageRequest(pageNumber - 1,
+					pageSize), strBuffer.toString(), params.toArray());
+		}
+		//strBuffer.append(" order by nlssort(m.user_name,'NLS_SORT=SCHINESE_PINYIN_M')");
+		strBuffer.append(" order by m.ssoid desc");
+		return dynamicQuery.nativeQuery(new PageRequest(pageNumber - 1,
+				pageSize), strBuffer.toString());
+	}
+}

@@ -1,0 +1,119 @@
+define(function(require, exports, module) {
+	var model = require("./model");
+	var utils = require("utils");
+	var view = Backbone.View.extend({
+		el: "div.ajax-content",
+		initialize:function(){
+			this.model=new model();
+		},
+		events:{
+			"click #btn-search":"search",
+			"click button[role='download']":"download"
+		},
+		render:function(){
+			this.initDataTables();
+		},
+		download:function(e){
+			var fileName = e.currentTarget.value;
+				$.get($$ctx+"/submitDetailQuery/fileIsExists?fileName="+fileName,function(message){
+					if (message == "") {
+						window.location.href = $$ctx+"/submitDetailQuery/download?fileName="+fileName;
+					}else {
+						bootbox.alert({
+							buttons:{
+								ok:{
+									label:"确定"
+								}
+							},
+							message:message
+						});
+					}
+				});
+		},
+		search:function(){
+			var viewSelf = this;
+			var oSearchData = {};
+			oSearchData.reportCycle = $("#report-cycle option:selected").val();
+			oSearchData.sumTimeBegin = $("#sum-time-begin").val();
+			oSearchData.sumTimeEnd = $("#sum-time-end").val();
+			oSearchData.sumPeople = $("#sum-people").val();
+			oSearchData.reportName = $("#report-name").val();
+			viewSelf.dt.oSearchData=oSearchData;//查询条件
+			viewSelf.dt.fnPageChange(0);
+		},
+		initDataTables:function(){
+			var viewSelf = this;
+			var dt = $("#tb_r").dataTable({
+				searching: false,
+			    ordering:  false,
+			    lengthMenu : [ [ 10, 20, 50, 100 ], [ 10, 20, 50, 100 ] ],// 每页显示多少条记录
+				ajax: {
+					type : "POST",
+					url : $$ctx + "/reportResultQuery/queryReportResult",
+					data :function(params) {
+						if(viewSelf.dt&&viewSelf.dt.oSearchData) {//循环遍历查询条件
+							 for(var key in viewSelf.dt.oSearchData) {
+								 params[key]=viewSelf.dt.oSearchData[key];
+					         }
+						}
+					}
+				},
+				columns : [
+				    {data : null },
+				    {data : [1] },
+			        {data : null ,render : function(data,type,row) {
+			        	if(row[2]==1){
+			        		return "一次性填报";
+			        	} else if(row[2]==2){
+			        		return "年报";
+			        	} else if(row[2]==3){
+			        		return "半年报";
+			        	} else if(row[2]==4){
+			        		return "季报";
+			        	} else if(row[2]==5){
+			        		return "月报";
+			        	} else if(row[2]==6){
+			        		return "旬报";
+			        	} else if(row[2]==7){
+			        		return "周报";
+			        	} else {
+			        		return "无";
+			        	}
+			        }},
+			        {data : null ,render : function(data,type,row) {
+			        	if(row[3]==null){
+			        		return "";
+			        	}else{
+			        		var date = new Date(parseInt(row[3]));//.toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ");
+			        		var day = date.getDate();
+				        	var month = date.getMonth()+1;
+				        	return date.getFullYear()+"-"+(month<10?(+"0"+month.toString()):month)+"-"+(day<10?(+"0"+day.toString()):day);
+			        	}
+			        } },
+			        {data : [4] },
+			        {data : null, render: function(data, type, row ) {
+			        	var loginName = $("#loginName").val();
+//			        	var operation = "<div class='btn-group'>";
+//			        		operation += "<button role='download' value='" + row[5] + "' name='download'  class='btn btn-xs btn-info glyphicon glyphicon-save' title='下载'></button>";
+//			        		operation += "</div>";
+//						return operation;
+						var div = $("<div class='btn-group'></div>");
+			        	var button1 = $("<button role='download' value='" + row[5] + "' name='download'  class='btn btn-xs btn-info glyphicon glyphicon-save' title='下载'></button>");
+//			        	if(row[4]!=null){
+				        	  if(row[4]!=loginName&&row[6]=='1'){//已汇总但登录人不是汇总人时不能下载
+				        				button1.attr("disabled", true);
+				    		}
+//			        	}
+				        div.append(button1);
+						return div[0].outerHTML;
+	                }}
+			    ],
+			    fnCreatedRow : function(nRow, aData, iDataIndex) {
+		    		$('td:eq(0)', nRow).html(iDataIndex + 1);
+		        }
+			});
+			viewSelf.dt = dt;
+		}
+	});
+	module.exports = view;
+});

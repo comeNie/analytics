@@ -1,0 +1,13 @@
+package com.orienttech.statics.service.model.workflow;
+
+public class Test{
+
+	public static void main(String[] args){
+		
+		
+		
+		
+	}
+		
+}
+

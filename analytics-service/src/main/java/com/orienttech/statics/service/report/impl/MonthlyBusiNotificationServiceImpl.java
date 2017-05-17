@@ -1,0 +1,957 @@
+package com.orienttech.statics.service.report.impl;
+
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.dao.entity.financialreport.ReportMonthHead;
+import com.orienttech.statics.dao.entity.financialreport.ReportMonthOrg;
+import com.orienttech.statics.dao.entity.financialreport.RiskReportMonth;
+import com.orienttech.statics.service.cognos.ReportRunnerService;
+import com.orienttech.statics.service.model.report.MonthlyBusiNotificationBo;
+import com.orienttech.statics.service.model.report.RiskReportMonthBo;
+import com.orienttech.statics.service.report.MonthlyBusiNotificationService;
+import com.orienttech.statics.service.report.RiskReportMonthService;
+/**   
+ * 类名称：MonthlyBusiNotificationServiceImpl
+ * 类描述 ：
+ * 创建人:wangxy
+ * 创建时间：2015年9月13日 下午13:08:54  
+ * 修改人：wangxy
+ * 修改时间：
+ * 修改备注：
+ * 版本： V1.0
+ */
+@Service
+public class MonthlyBusiNotificationServiceImpl implements MonthlyBusiNotificationService {
+
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private ReportRunnerService reportRunnerService;
+	
+	/**
+	 * 查询本期数据
+	 * @param bo
+	 * @param condition
+	 * @return
+	 */
+	@Override
+	public MonthlyBusiNotificationBo searchCurMonthDatas(String busiDate){
+		
+		StringBuffer sb = new StringBuffer("select t.report_id,t.busi_month,t.rank_num,t.org_id,t.org_name,"
+				+ " t.apply_user_name,t.amt1,t.amt2,t.amt3,t.amt4,t.amt5,t.amt6,t.memo"
+				+ " from report_month_head t where t.busi_month=?1"
+				+ " order by t.rank_num");
+		List<Object[]> objsList = dynamicQuery.nativeQuery(Object[].class, sb.toString(), busiDate);
+		
+		MonthlyBusiNotificationBo bo = new MonthlyBusiNotificationBo();
+		//业务日期
+		bo.setBusiDate(busiDate);
+		//要生成word的名称
+		String time = new SimpleDateFormat("yyyyMMddhhmmss").format(new Date());
+		bo.setOutFileName(time);
+		
+		if(objsList.size()==0 || objsList==null){
+			return null;
+		}
+		//TODO 
+		for(Object[] objs : objsList){
+			String reportId = CommonHelper.toStr(objs[0]);
+			String busiMonth = CommonHelper.toStr(objs[1]);
+			Integer rankNum = CommonHelper.toInt(objs[2]);
+			String orgId = CommonHelper.toStr(objs[3]);
+			String orgName =  CommonHelper.toStr(objs[4]);
+			String applyUserName =  CommonHelper.toStr(objs[5]);
+			BigDecimal amt1 =  CommonHelper.toBigDecimal(objs[6]);
+			BigDecimal amt2 =  CommonHelper.toBigDecimal(objs[7]);
+			BigDecimal amt3 =  CommonHelper.toBigDecimal(objs[8]);
+			BigDecimal amt4 =  CommonHelper.toBigDecimal(objs[9]);
+			BigDecimal amt5 =  CommonHelper.toBigDecimal(objs[10]);
+			BigDecimal amt6 =  CommonHelper.toBigDecimal(objs[11]);
+			String memo = CommonHelper.toStr(objs[12]);
+			//第一段 结存贷款整体情况
+			if( reportId.equalsIgnoreCase("A001")){
+				bo.setBusiNumber1(amt4);
+			}
+			if( reportId.equalsIgnoreCase("A001")){
+				bo.setBusiNumber2(amt1);
+			}
+			if( reportId.equalsIgnoreCase("A001")){
+				bo.setBusiNumber3(amt2);
+			}
+			if( reportId.equalsIgnoreCase("A001")){
+				bo.setBusiNumber4(amt3);
+			}
+			//第二段 全辖累计投放贷款整体情况
+			if( reportId.equalsIgnoreCase("A021")){
+				bo.setBusiNumber5(amt4);
+			}
+			if( reportId.equalsIgnoreCase("A023")){
+				bo.setBusiNumber6(amt4);
+			}
+			if( reportId.equalsIgnoreCase("A021")){
+				bo.setBusiNumber7(amt1);
+			}
+			if( reportId.equalsIgnoreCase("A023")){
+				bo.setBusiNumber8(amt1);
+			}
+			//第三段 2015年7月全辖投放贷款整体情况
+			if( reportId.equalsIgnoreCase("A031")){
+				bo.setBusiNumber9(amt4);
+			}
+			if( reportId.equalsIgnoreCase("A031")){
+				bo.setBusiNumber10(amt1);
+			}
+			if( reportId.equalsIgnoreCase("A031")){
+				bo.setBusiNumber11(amt2);
+			}
+			if( reportId.equalsIgnoreCase("A031")){
+				bo.setBusiNumber12(amt3);
+			}
+			//第四段 小贷公司贷款整体情况/结存贷款整体情况
+			if( reportId.equalsIgnoreCase("B001")){
+				bo.setBusiNumber13(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B001")){
+				bo.setBusiNumber14(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B001")){
+				bo.setBusiNumber15(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B001")){
+				bo.setBusiNumber16(amt4);
+			}
+			if( reportId.equalsIgnoreCase("B014")){
+				bo.setBusiNumber17(amt1);
+			}
+			//第五段 小贷公司贷款整体情况/结存贷款整体情况
+			if( reportId.equalsIgnoreCase("B008")){
+				bo.setBusiNumber18(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B008")){
+				bo.setBusiNumber19(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B008")){
+				bo.setBusiNumber20(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B008")){
+				bo.setBusiNumber21(amt4);
+			}
+			//第六段 2015年1-X月小贷公司累计投放贷款整体情况
+			if( reportId.equalsIgnoreCase("B021")){
+				bo.setBusiNumber22(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B023")){
+				bo.setBusiNumber23(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B021")){
+				bo.setBusiNumber24(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B023")){
+				bo.setBusiNumber25(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B021")){
+				bo.setBusiNumber26(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B023")){
+				bo.setBusiNumber27(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B024")){
+				bo.setBusiNumber28(amt1);
+			}
+			//第七段 2015年1-X月小贷公司累计投放贷款整体情况
+			if( reportId.equalsIgnoreCase("B031")){
+				bo.setBusiNumber29(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B025")){
+				bo.setBusiNumber30(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B031")){
+				bo.setBusiNumber31(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B031")){
+				bo.setBusiNumber32(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B031")){
+				bo.setBusiNumber33(amt4);
+			}
+			//第八段 2015年X月小贷公司投放贷款整体情况
+			if( reportId.equalsIgnoreCase("B041")){
+				bo.setBusiNumber34(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B044")){
+				bo.setBusiNumber35(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B045")){
+				bo.setBusiNumber36(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B041")){
+				bo.setBusiNumber37(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B044")){
+				bo.setBusiNumber38(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B045")){
+				bo.setBusiNumber39(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B041")){
+				bo.setBusiNumber40(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B044")){
+				bo.setBusiNumber41(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B045")){
+				bo.setBusiNumber42(amt3);
+			}
+			if( reportId.equalsIgnoreCase("B046")){
+				bo.setBusiNumber43(amt1);
+			}
+			//第九段 2015年X月小贷公司投放贷款整体情况
+			if( reportId.equalsIgnoreCase("B051")){
+				bo.setBusiNumber44(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B057")){
+				bo.setBusiNumber45(amt1);
+			}
+			if( reportId.equalsIgnoreCase("B051")){
+				bo.setBusiNumber46(amt2);
+			}
+			if( reportId.equalsIgnoreCase("B051")){
+				bo.setBusiNumber47(amt3);
+			}
+			//第十段 推荐类业务分析
+			if( reportId.equalsIgnoreCase("C007")){
+				bo.setBusiNumber48(amt2);
+			}
+			if( reportId.equalsIgnoreCase("C007")){
+				bo.setBusiNumber49(amt1);
+			}
+			if( reportId.equalsIgnoreCase("C002")){
+				bo.setBusiNumber50(amt2);
+			}
+			if( reportId.equalsIgnoreCase("C002")){
+				bo.setBusiNumber51(amt1);
+			}
+			if( reportId.equalsIgnoreCase("C004")){
+				bo.setBusiNumber52(amt2);
+			}
+			if( reportId.equalsIgnoreCase("C004")){
+				bo.setBusiNumber53(amt1);
+			}
+			if( reportId.equalsIgnoreCase("C006")){
+				bo.setBusiNumber54(amt2);
+			}
+			if( reportId.equalsIgnoreCase("C006")){
+				bo.setBusiNumber55(amt1);
+			}
+			
+			if( reportId.equalsIgnoreCase("C007")){
+				bo.setBusiNumber56(amt4);
+			}
+			if( reportId.equalsIgnoreCase("C007")){
+				bo.setBusiNumber57(amt3);
+			}
+			if( reportId.equalsIgnoreCase("C002")){
+				bo.setBusiNumber58(amt4);
+			}
+			if( reportId.equalsIgnoreCase("C002")){
+				bo.setBusiNumber59(amt3);
+			}
+			if( reportId.equalsIgnoreCase("C004")){
+				bo.setBusiNumber60(amt4);
+			}
+			if( reportId.equalsIgnoreCase("C004")){
+				bo.setBusiNumber61(amt3);
+			}
+			if( reportId.equalsIgnoreCase("C006")){
+				bo.setBusiNumber62(amt4);
+			}
+			if( reportId.equalsIgnoreCase("C006")){
+				bo.setBusiNumber63(amt3);
+			}
+			
+			ReportMonthHead tableData = new ReportMonthHead();
+			tableData.setReportId(reportId);
+			tableData.setBusiMonth(busiMonth);
+			tableData.setRankNum(rankNum);
+			tableData.setOrgId(orgId);
+			tableData.setOrgName(orgName);
+			tableData.setApplyUserName(applyUserName);
+			tableData.setAmt1(amt1);
+			tableData.setAmt2(amt2);
+			tableData.setAmt3(amt3);
+			tableData.setAmt4(amt4);
+			tableData.setAmt5(amt5);
+			tableData.setAmt6(amt6);
+			tableData.setMemo(memo);
+			//TODO 表1
+			if(reportId.equalsIgnoreCase("A001")){
+				bo.setTableData1001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A002")){
+				bo.setTableData1002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A003")){
+				bo.setTableData1003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A004")){
+				bo.setTableData1004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A005")){
+				bo.setTableData1005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A006")){
+				bo.setTableData1006(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A007")){
+				bo.setTableData1007(tableData);
+			}
+			//表2
+			if(reportId.equalsIgnoreCase("A001")){
+				bo.setTableData2001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A008")){
+				bo.setTableData2002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A009")){
+				bo.setTableData2003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A010")){
+				bo.setTableData2004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A011")){
+				bo.setTableData2005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A012")){
+				bo.setTableData2006(tableData);
+			}
+			//表3
+			if(reportId.equalsIgnoreCase("A021")){
+				bo.setTableData3001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A022")){
+				bo.setTableData3002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A023")){
+				bo.setTableData3003(tableData);
+			}
+			//表4
+			if(reportId.equalsIgnoreCase("A021")){
+				bo.setTableData4001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A024")){
+				bo.setTableData4002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A025")){
+				bo.setTableData4003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A026")){
+				bo.setTableData4004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A027")){
+				bo.setTableData4005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A028")){
+				bo.setTableData4006(tableData);
+			}
+			//表5
+			if(reportId.equalsIgnoreCase("A031")){
+				bo.setTableData5001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A032")){
+				bo.setTableData5002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A033")){
+				bo.setTableData5003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A034")){
+				bo.setTableData5004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A035")){
+				bo.setTableData5005(tableData);
+			}
+			//表6
+			if(reportId.equalsIgnoreCase("A031")){
+				bo.setTableData6001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A036")){
+				bo.setTableData6002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A037")){
+				bo.setTableData6003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A038")){
+				bo.setTableData6004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A039")){
+				bo.setTableData6005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("A040")){
+				bo.setTableData6006(tableData);
+			}
+			//表7
+			if(reportId.equalsIgnoreCase("B001")){
+				bo.setTableData7001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B002")){
+				bo.setTableData7002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B003")){
+				bo.setTableData7003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B004")){
+				bo.setTableData7004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B005")){
+				bo.setTableData7005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B006")){
+				bo.setTableData7006(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B007")){
+				bo.setTableData7007(tableData);
+			}
+			//表8
+			if(reportId.equalsIgnoreCase("B008")){
+				bo.setTableData8001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B009")){
+				bo.setTableData8002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B010")){
+				bo.setTableData8003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B011")){
+				bo.setTableData8004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B012")){
+				bo.setTableData8005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B013")){
+				bo.setTableData8006(tableData);
+			}
+			//表9
+			if(reportId.equalsIgnoreCase("B021")){
+				bo.setTableData9001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B022")){
+				bo.setTableData9002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B023")){
+				bo.setTableData9003(tableData);
+			}
+			//表10
+			if(reportId.equalsIgnoreCase("B031")){
+				bo.setTableData10001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B032")){
+				bo.setTableData10002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B033")){
+				bo.setTableData10003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B034")){
+				bo.setTableData10004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B035")){
+				bo.setTableData10005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B036")){
+				bo.setTableData10006(tableData);
+			}
+			//表11
+			if(reportId.equalsIgnoreCase("B041")){
+				bo.setTableData11001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B042")){
+				bo.setTableData11002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B043")){
+				bo.setTableData11003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B044")){
+				bo.setTableData11004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B045")){
+				bo.setTableData11005(tableData);
+			}
+			//表12
+			if(reportId.equalsIgnoreCase("B051")){
+				bo.setTableData12001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B052")){
+				bo.setTableData12002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B053")){
+				bo.setTableData12003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B054")){
+				bo.setTableData12004(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B055")){
+				bo.setTableData12005(tableData);
+			}
+			if(reportId.equalsIgnoreCase("B056")){
+				bo.setTableData12006(tableData);
+			}
+			//表13
+			if(reportId.equalsIgnoreCase("C001")){
+				bo.setTableData13001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("C002")){
+				bo.setTableSum13001(amt1);
+				bo.setTableSum13002(amt2);
+				bo.setTableSum13003(amt3);
+				bo.setTableSum13004(amt4);
+			}
+			if(reportId.equalsIgnoreCase("C003")){
+				bo.setTableData13002(tableData);
+			}
+			if(reportId.equalsIgnoreCase("C004")){
+				bo.setTableSum13005(amt1);
+				bo.setTableSum13006(amt2);
+				bo.setTableSum13007(amt3);
+				bo.setTableSum13008(amt4);
+			}
+			if(reportId.equalsIgnoreCase("C005")){
+				bo.setTableData13003(tableData);
+			}
+			if(reportId.equalsIgnoreCase("C006")){
+				bo.setTableSum13009(amt1);
+				bo.setTableSum130010(amt2);
+				bo.setTableSum130011(amt3);
+				bo.setTableSum130012(amt4);
+			}
+			if(reportId.equalsIgnoreCase("C007")){
+				bo.setTableSum130013(amt1);
+				bo.setTableSum130014(amt2);
+				bo.setTableSum130015(amt3);
+				bo.setTableSum130016(amt4);
+			}
+			//表14
+			if(reportId.equalsIgnoreCase("D001")){
+				bo.setTableData14001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D002")){
+				bo.setTableSum14001(amt1);
+				bo.setTableSum14002(amt2);
+				bo.setTableSum14003(amt3);
+			}
+			//表15
+			if(reportId.equalsIgnoreCase("D003")){
+				bo.setTableData15001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D004")){
+				bo.setTableSum15001(amt1);
+				bo.setTableSum15002(amt2);
+				bo.setTableSum15003(amt3);
+			}
+			//表16
+			if(reportId.equalsIgnoreCase("D005")){
+				bo.setTableData16001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D006")){
+				bo.setTableSum16001(amt1);
+				bo.setTableSum16002(amt2);
+			}
+			//表17
+			if(reportId.equalsIgnoreCase("D007")){
+				bo.setTableData17001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D008")){
+				bo.setTableSum17001(amt1);
+				bo.setTableSum17002(amt2);
+				bo.setTableSum17003(amt3);
+			}
+			//表18
+			if(reportId.equalsIgnoreCase("D009")){
+				bo.setTableData18001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D010")){
+				bo.setTableSum18001(amt1);
+				bo.setTableSum18002(amt2);
+				bo.setTableSum18003(amt3);
+			}
+			//表19
+			if(reportId.equalsIgnoreCase("D011")){
+				bo.setTableData19001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D012")){
+				bo.setTableSum19001(amt1);
+				bo.setTableSum19002(amt2);
+			}
+			//表20
+			if(reportId.equalsIgnoreCase("D013")){
+				bo.setTableData20001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D014")){
+				bo.setTableSum20001(amt1);
+				bo.setTableSum20002(amt2);
+				bo.setTableSum20003(amt3);
+			}
+			//表21
+			if(reportId.equalsIgnoreCase("D015")){
+				bo.setTableData21001(tableData);
+			}
+			if(reportId.equalsIgnoreCase("D016")){
+				bo.setTableSum21001(amt1);
+				bo.setTableSum21002(amt2);
+				bo.setTableSum21003(amt3);
+			}
+			//表22
+			if(reportId.equalsIgnoreCase("D017")){
+				bo.setTableData22001(tableData);
+			}
+			//表23
+			if(reportId.equalsIgnoreCase("D018")){
+				bo.setTableData23001(tableData);
+			}
+		}
+		return bo;
+	}
+	
+	@Override
+	public Map<String, Object> toGetMap(MonthlyBusiNotificationBo bo) {
+		Map<String, Object> dataMap = new HashMap<String, Object>();
+		
+		String busiYear = bo.getBusiDate().substring(0,4);//本年
+		String lbusiYear = String.valueOf(Integer.parseInt(bo.getBusiDate().substring(0,4))-1);//去年
+		String busiMonth = "";//本月
+		if (bo.getBusiDate().substring(4,5).equals("0")){
+			busiMonth = bo.getBusiDate().substring(5,6);
+		}else{
+			busiMonth = bo.getBusiDate().substring(4,6);
+		}
+//		String lbusiMonth = String.valueOf(Integer.parseInt(busiMonth)-1);//上月
+		String busiYear2 = busiYear;
+		String lbusiMonth = "";
+		if(busiMonth.equals("1")){
+			busiYear2 = lbusiYear;
+			lbusiMonth = "12";
+		}else{
+			lbusiMonth = String.valueOf(Integer.parseInt(busiMonth)-1);//上月
+		}
+		
+		String numberFlag1 = bo.getBusiNumber6().signum()<0 ? "下降" : "增长";
+		String numberFlag2 = bo.getBusiNumber8().signum()<0 ? "下降" : "增长";
+		String numberFlag3 = bo.getBusiNumber23().signum()<0 ? "下降" : "增长";
+		String numberFlag4 = bo.getBusiNumber25().signum()<0 ? "下降" : "增长";
+		String numberFlag5 = bo.getBusiNumber27().signum()<0 ? "下降" : "增长";
+		String numberFlag6 = bo.getBusiNumber35().signum()<0 ? "下降" : "增长";
+		String numberFlag7 = bo.getBusiNumber36().signum()<0 ? "下降" : "增长";
+		String numberFlag8 = bo.getBusiNumber38().signum()<0 ? "下降" : "增长";
+		String numberFlag9 = bo.getBusiNumber39().signum()<0 ? "下降" : "增长";
+		String numberFlag10 = bo.getBusiNumber41().signum()<0 ? "下降" : "增长";
+		String numberFlag11 = bo.getBusiNumber42().signum()<0 ? "下降" : "增长";
+		
+		BigDecimal busiNumber1 = bo.getBusiNumber1().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber2 = bo.getBusiNumber2().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber3 = bo.getBusiNumber3().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber4 = bo.getBusiNumber4().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		
+		BigDecimal busiNumber5 = bo.getBusiNumber5().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber6 = bo.getBusiNumber6().abs();
+		BigDecimal busiNumber7 = bo.getBusiNumber7().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber8 = bo.getBusiNumber8().abs();
+		
+		BigDecimal busiNumber9 = bo.getBusiNumber9().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber10 = bo.getBusiNumber10().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber11 = bo.getBusiNumber11().abs();
+		BigDecimal busiNumber12 = bo.getBusiNumber12().abs();
+		
+		BigDecimal busiNumber13 = bo.getBusiNumber13().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber14 = bo.getBusiNumber14().abs();
+		BigDecimal busiNumber15 = bo.getBusiNumber15().abs();
+		BigDecimal busiNumber16 = bo.getBusiNumber16().abs();
+		BigDecimal busiNumber17 = bo.getBusiNumber17().abs();
+		
+		BigDecimal busiNumber18 = bo.getBusiNumber18().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber19 = bo.getBusiNumber19().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber20 = bo.getBusiNumber20().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber21 = bo.getBusiNumber21().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		
+		BigDecimal busiNumber22 = bo.getBusiNumber22().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber23 = bo.getBusiNumber23().abs();
+		BigDecimal busiNumber24 = bo.getBusiNumber24().abs();
+		BigDecimal busiNumber25 = bo.getBusiNumber25().abs();
+		BigDecimal busiNumber26 = bo.getBusiNumber26().abs();
+		BigDecimal busiNumber27 = bo.getBusiNumber27().abs();
+		BigDecimal busiNumber28 = bo.getBusiNumber28().abs();
+		
+		BigDecimal busiNumber29 = bo.getBusiNumber29().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber30 = bo.getBusiNumber30().abs();
+		BigDecimal busiNumber31 = bo.getBusiNumber31().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber32 = bo.getBusiNumber32().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber33 = bo.getBusiNumber33().abs();
+		
+		BigDecimal busiNumber34 = bo.getBusiNumber34().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber35 = bo.getBusiNumber35().abs();
+		BigDecimal busiNumber36 = bo.getBusiNumber36().abs();
+		BigDecimal busiNumber37 = bo.getBusiNumber37().abs();
+		BigDecimal busiNumber38 = bo.getBusiNumber38().abs();
+		BigDecimal busiNumber39 = bo.getBusiNumber39().abs();
+		BigDecimal busiNumber40 = bo.getBusiNumber40().abs();
+		BigDecimal busiNumber41 = bo.getBusiNumber41().abs();
+		BigDecimal busiNumber42 = bo.getBusiNumber42().abs();
+		BigDecimal busiNumber43 = bo.getBusiNumber43().abs();
+		
+		BigDecimal busiNumber44 = bo.getBusiNumber44().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber45 = bo.getBusiNumber45().abs();
+		BigDecimal busiNumber46 = bo.getBusiNumber46().abs();
+		BigDecimal busiNumber47 = bo.getBusiNumber47().abs();
+		
+		BigDecimal busiNumber48 = bo.getBusiNumber48().abs();
+		BigDecimal busiNumber49 = bo.getBusiNumber49().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber50 = bo.getBusiNumber50().abs();
+		BigDecimal busiNumber51 = bo.getBusiNumber51().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber52 = bo.getBusiNumber52().abs();
+		BigDecimal busiNumber53 = bo.getBusiNumber53().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber54 = bo.getBusiNumber54().abs();
+		BigDecimal busiNumber55 = bo.getBusiNumber55().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		
+		BigDecimal busiNumber56 = bo.getBusiNumber56().abs();
+		BigDecimal busiNumber57 = bo.getBusiNumber57().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber58 = bo.getBusiNumber58().abs();
+		BigDecimal busiNumber59 = bo.getBusiNumber59().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber60 = bo.getBusiNumber60().abs();
+		BigDecimal busiNumber61 = bo.getBusiNumber61().divide(new BigDecimal(10000),2,BigDecimal.ROUND_HALF_UP).abs();
+		BigDecimal busiNumber62 = bo.getBusiNumber62().abs();
+		BigDecimal busiNumber63 = bo.getBusiNumber63().abs();
+
+		dataMap.put("busiYear",busiYear);
+		dataMap.put("busiYear2",busiYear2);
+		dataMap.put("lbusiYear",lbusiYear);
+		dataMap.put("busiMonth",busiMonth);
+		dataMap.put("lbusiMonth",lbusiMonth);
+		//增长下降
+		dataMap.put("numberFlag1",numberFlag1);
+		dataMap.put("numberFlag2",numberFlag2);
+		dataMap.put("numberFlag3",numberFlag3);
+		dataMap.put("numberFlag4",numberFlag4);
+		dataMap.put("numberFlag5",numberFlag5);
+		dataMap.put("numberFlag6",numberFlag6);
+		dataMap.put("numberFlag7",numberFlag7);
+		dataMap.put("numberFlag8",numberFlag8);
+		dataMap.put("numberFlag9",numberFlag9);
+		dataMap.put("numberFlag10",numberFlag10);
+		dataMap.put("numberFlag11",numberFlag11);
+		
+		//数字
+		dataMap.put("busiNumber1",busiNumber1);
+		dataMap.put("busiNumber2",busiNumber2);
+		dataMap.put("busiNumber3",busiNumber3);
+		dataMap.put("busiNumber4",busiNumber4);
+		dataMap.put("busiNumber5",busiNumber5);
+		dataMap.put("busiNumber6",busiNumber6);
+		dataMap.put("busiNumber7",busiNumber7);
+		dataMap.put("busiNumber8",busiNumber8);
+		dataMap.put("busiNumber9",busiNumber9);
+		dataMap.put("busiNumber10",busiNumber10);
+		dataMap.put("busiNumber11",busiNumber11);
+		dataMap.put("busiNumber12",busiNumber12);
+		dataMap.put("busiNumber13",busiNumber13);
+		dataMap.put("busiNumber14",busiNumber14);
+		dataMap.put("busiNumber15",busiNumber15);
+		dataMap.put("busiNumber16",busiNumber16);
+		dataMap.put("busiNumber17",busiNumber17);
+		dataMap.put("busiNumber18",busiNumber18);
+		dataMap.put("busiNumber19",busiNumber19);
+		dataMap.put("busiNumber20",busiNumber20);
+		dataMap.put("busiNumber21",busiNumber21);
+		dataMap.put("busiNumber22",busiNumber22);
+		dataMap.put("busiNumber23",busiNumber23);
+		dataMap.put("busiNumber24",busiNumber24);
+		dataMap.put("busiNumber25",busiNumber25);
+		dataMap.put("busiNumber26",busiNumber26);
+		dataMap.put("busiNumber27",busiNumber27);
+		dataMap.put("busiNumber28",busiNumber28);
+		dataMap.put("busiNumber29",busiNumber29);
+		dataMap.put("busiNumber30",busiNumber30);
+		dataMap.put("busiNumber31",busiNumber31);
+		dataMap.put("busiNumber32",busiNumber32);
+		dataMap.put("busiNumber33",busiNumber33);
+		dataMap.put("busiNumber34",busiNumber34);
+		dataMap.put("busiNumber35",busiNumber35);
+		dataMap.put("busiNumber36",busiNumber36);
+		dataMap.put("busiNumber37",busiNumber37);
+		dataMap.put("busiNumber38",busiNumber38);
+		dataMap.put("busiNumber39",busiNumber39);
+		dataMap.put("busiNumber40",busiNumber40);
+		dataMap.put("busiNumber41",busiNumber41);
+		dataMap.put("busiNumber42",busiNumber42);
+		dataMap.put("busiNumber43",busiNumber43);
+		dataMap.put("busiNumber44",busiNumber44);
+		dataMap.put("busiNumber45",busiNumber45);
+		dataMap.put("busiNumber46",busiNumber46);
+		dataMap.put("busiNumber47",busiNumber47);
+		dataMap.put("busiNumber48",busiNumber48);
+		dataMap.put("busiNumber49",busiNumber49);
+		dataMap.put("busiNumber50",busiNumber50);
+		dataMap.put("busiNumber51",busiNumber51);
+		dataMap.put("busiNumber52",busiNumber52);
+		dataMap.put("busiNumber53",busiNumber53);
+		dataMap.put("busiNumber54",busiNumber54);
+		dataMap.put("busiNumber55",busiNumber55);
+		dataMap.put("busiNumber56",busiNumber56);
+		dataMap.put("busiNumber57",busiNumber57);
+		dataMap.put("busiNumber58",busiNumber58);
+		dataMap.put("busiNumber59",busiNumber59);
+		dataMap.put("busiNumber60",busiNumber60);
+		dataMap.put("busiNumber61",busiNumber61);
+		dataMap.put("busiNumber62",busiNumber62);
+		dataMap.put("busiNumber63",busiNumber63);
+		//TODO 表1
+		dataMap.put("tbl1001", bo.getTableData1001());
+		dataMap.put("tbl1002", bo.getTableData1002());
+		dataMap.put("tbl1003", bo.getTableData1003());
+		dataMap.put("tbl1004", bo.getTableData1004());
+		dataMap.put("tbl1005", bo.getTableData1005());
+		dataMap.put("tbl1006", bo.getTableData1006());
+		dataMap.put("tbl1007", bo.getTableData1007());
+		//表2
+		dataMap.put("tbl2001", bo.getTableData2001());
+		dataMap.put("tbl2002", bo.getTableData2002());
+		dataMap.put("tbl2003", bo.getTableData2003());
+		dataMap.put("tbl2004", bo.getTableData2004());
+		dataMap.put("tbl2005", bo.getTableData2005());
+		dataMap.put("tbl2006", bo.getTableData2006());
+		//表3
+		dataMap.put("tbl3001", bo.getTableData3001());
+		dataMap.put("tbl3002", bo.getTableData3002());
+		dataMap.put("tbl3003", bo.getTableData3003());
+		//表4
+		dataMap.put("tbl4001", bo.getTableData4001());
+		dataMap.put("tbl4002", bo.getTableData4002());
+		dataMap.put("tbl4003", bo.getTableData4003());
+		dataMap.put("tbl4004", bo.getTableData4004());
+		dataMap.put("tbl4005", bo.getTableData4005());
+		dataMap.put("tbl4006", bo.getTableData4006());
+		//表5
+		dataMap.put("tbl5001", bo.getTableData5001());
+		dataMap.put("tbl5002", bo.getTableData5002());
+		dataMap.put("tbl5003", bo.getTableData5003());
+		dataMap.put("tbl5004", bo.getTableData5004());
+		dataMap.put("tbl5005", bo.getTableData5005());
+		//表6
+		dataMap.put("tbl6001", bo.getTableData6001());
+		dataMap.put("tbl6002", bo.getTableData6002());
+		dataMap.put("tbl6003", bo.getTableData6003());
+		dataMap.put("tbl6004", bo.getTableData6004());
+		dataMap.put("tbl6005", bo.getTableData6005());
+		dataMap.put("tbl6006", bo.getTableData6006());
+		//表7
+		dataMap.put("tbl7001", bo.getTableData7001());
+		dataMap.put("tbl7002", bo.getTableData7002());
+		dataMap.put("tbl7003", bo.getTableData7003());
+		dataMap.put("tbl7004", bo.getTableData7004());
+		dataMap.put("tbl7005", bo.getTableData7005());
+		dataMap.put("tbl7006", bo.getTableData7006());
+		dataMap.put("tbl7007", bo.getTableData7007());
+		//表8
+		dataMap.put("tbl8001", bo.getTableData8001());
+		dataMap.put("tbl8002", bo.getTableData8002());
+		dataMap.put("tbl8003", bo.getTableData8003());
+		dataMap.put("tbl8004", bo.getTableData8004());
+		dataMap.put("tbl8005", bo.getTableData8005());
+		dataMap.put("tbl8006", bo.getTableData8006());
+		//表9
+		dataMap.put("tbl9001", bo.getTableData9001());
+		dataMap.put("tbl9002", bo.getTableData9002());
+		dataMap.put("tbl9003", bo.getTableData9003());
+		//表10
+		dataMap.put("tbl10001", bo.getTableData10001());
+		dataMap.put("tbl10002", bo.getTableData10002());
+		dataMap.put("tbl10003", bo.getTableData10003());
+		dataMap.put("tbl10004", bo.getTableData10004());
+		dataMap.put("tbl10005", bo.getTableData10005());
+		dataMap.put("tbl10006", bo.getTableData10006());
+		//表11
+		dataMap.put("tbl11001", bo.getTableData11001());
+		dataMap.put("tbl11002", bo.getTableData11002());
+		dataMap.put("tbl11003", bo.getTableData11003());
+		dataMap.put("tbl11004", bo.getTableData11004());
+		dataMap.put("tbl11005", bo.getTableData11005());
+		//表12
+		dataMap.put("tbl12001", bo.getTableData12001());
+		dataMap.put("tbl12002", bo.getTableData12002());
+		dataMap.put("tbl12003", bo.getTableData12003());
+		dataMap.put("tbl12004", bo.getTableData12004());
+		dataMap.put("tbl12005", bo.getTableData12005());
+		dataMap.put("tbl12006", bo.getTableData12006());
+		//表13
+		dataMap.put("tbl13001", bo.getTableData13001());
+		dataMap.put("tblSum13001", bo.getTableSum13001());
+		dataMap.put("tblSum13002", bo.getTableSum13002());
+		dataMap.put("tblSum13003", bo.getTableSum13003());
+		dataMap.put("tblSum13004", bo.getTableSum13004());
+		
+		dataMap.put("tbl13002", bo.getTableData13002());
+		dataMap.put("tblSum13005", bo.getTableSum13005());
+		dataMap.put("tblSum13006", bo.getTableSum13006());
+		dataMap.put("tblSum13007", bo.getTableSum13007());
+		dataMap.put("tblSum13008", bo.getTableSum13008());
+		
+		dataMap.put("tbl13003", bo.getTableData13003());
+		dataMap.put("tblSum13009", bo.getTableSum13009());
+		dataMap.put("tblSum130010", bo.getTableSum130010());
+		dataMap.put("tblSum130011", bo.getTableSum130011());
+		dataMap.put("tblSum130012", bo.getTableSum130012());
+		dataMap.put("tblSum130013", bo.getTableSum130013());
+		dataMap.put("tblSum130014", bo.getTableSum130014());
+		dataMap.put("tblSum130015", bo.getTableSum130015());
+		dataMap.put("tblSum130016", bo.getTableSum130016());
+		//表14
+		dataMap.put("tbl14001", bo.getTableData14001());
+		dataMap.put("tblSum14001", bo.getTableSum14001());
+		dataMap.put("tblSum14002", bo.getTableSum14002());
+		dataMap.put("tblSum14003", bo.getTableSum14003());
+		//表15
+		dataMap.put("tbl15001", bo.getTableData15001());
+		dataMap.put("tblSum15001", bo.getTableSum15001());
+		dataMap.put("tblSum15002", bo.getTableSum15002());
+		dataMap.put("tblSum15003", bo.getTableSum15003());
+		//表16
+		dataMap.put("tbl16001", bo.getTableData16001());
+		dataMap.put("tblSum16001", bo.getTableSum16001());
+		dataMap.put("tblSum16002", bo.getTableSum16002());
+		//表17
+		dataMap.put("tbl17001", bo.getTableData17001());
+		dataMap.put("tblSum17001", bo.getTableSum17001());
+		dataMap.put("tblSum17002", bo.getTableSum17002());
+		dataMap.put("tblSum17003", bo.getTableSum17003());
+		//表18
+		dataMap.put("tbl18001", bo.getTableData18001());
+		dataMap.put("tblSum18001", bo.getTableSum18001());
+		dataMap.put("tblSum18002", bo.getTableSum18002());
+		dataMap.put("tblSum18003", bo.getTableSum18003());
+		//表19
+		dataMap.put("tbl19001", bo.getTableData19001());
+		dataMap.put("tblSum19001", bo.getTableSum19001());
+		dataMap.put("tblSum19002", bo.getTableSum19002());
+		//表20
+		dataMap.put("tbl20001", bo.getTableData20001());
+		dataMap.put("tblSum20001", bo.getTableSum20001());
+		dataMap.put("tblSum20002", bo.getTableSum20002());
+		dataMap.put("tblSum20003", bo.getTableSum20003());
+		//表21
+		dataMap.put("tbl21001", bo.getTableData21001());
+		dataMap.put("tblSum21001", bo.getTableSum21001());
+		dataMap.put("tblSum21002", bo.getTableSum21002());
+		dataMap.put("tblSum21003", bo.getTableSum21003());
+		//表22
+		dataMap.put("tbl22001", bo.getTableData22001());
+		//表23
+		dataMap.put("tbl23001", bo.getTableData23001());
+		
+		return dataMap;
+	}
+}

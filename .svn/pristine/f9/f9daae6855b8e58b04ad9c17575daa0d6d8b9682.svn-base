@@ -1,0 +1,18 @@
+package com.orienttech.statics.service.model.workflow;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+
+public class Test {
+	
+	public static void main(String[] args){
+		List<String> list1 = Collections.emptyList();
+		List<String> list2 = new ArrayList<String>();
+//		list1.add("123");
+		
+		System.out.println("123");
+	}
+	
+}

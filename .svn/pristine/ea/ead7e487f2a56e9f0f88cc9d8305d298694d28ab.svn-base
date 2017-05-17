@@ -1,0 +1,7 @@
+###Local WebServices Test###
+analyticsWs=http://172.16.49.150:8080/analytics/services/analyticsSync?wsdl
+#analyticsWs=http://23.4.160.35:7001/analytics/services/analyticsSync?wsdl
+#analyticsWs=http://172.16.49.243:7002/analytics/services/analyticsSync?wsdl
+taskCenterService=http://172.16.49.243:7001/taskcenter/services/taskCenterService?wsdl
+#workflowService=http://172.16.49.160:8080/workflow/services/workflowService?wsdl
+workflowService=http://172.16.49.243:7001/workflow/services/workflowService?wsdl

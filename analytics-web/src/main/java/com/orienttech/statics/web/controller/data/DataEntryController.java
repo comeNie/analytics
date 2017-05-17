@@ -1,0 +1,213 @@
+/**
+ * 数据报送录入
+ * @author gph
+ */
+package com.orienttech.statics.web.controller.data;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.base.Result;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.entity.submission.TblReportTemplate;
+import com.orienttech.statics.dao.entity.submission.TblTemplateSubmit;
+import com.orienttech.statics.service.datasubmitted.DataEntryService;
+import com.orienttech.statics.service.stadimorg.StaDimOrgService;
+import com.orienttech.statics.service.sysmng.RoleMngService;
+import com.orienttech.statics.service.workflow.WorkFlowService.WorkFlowNode;
+
+@Controller
+@RequestMapping("/dataEntry")
+public class DataEntryController extends BaseController {
+	private Log log = LogFactory.getLog(DataEntryController.class);
+
+	@Autowired
+	private DataEntryService dataEntryService;// 数据录入
+	@Autowired
+	private StaDimOrgService staDimOrgService;// 机构
+	@Autowired
+	private RoleMngService roleMngService;// 角色
+
+	@RequestMapping
+	public String main() {
+		return "/data/dataEntry";
+	}
+
+	/**
+	 * 获取报表模版
+	 * @param workflowId 流程Id
+	 * @param orgId 机构Id
+	 * @param nodeId 环节Id
+	 * @return
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/getTemplate", method = RequestMethod.POST)
+	@ResponseBody
+	public Result getReportTemplate(String workflowId,String nodeId)
+			throws Exception {
+		log.info("获取报表模版...");
+		try {
+			TblReportTemplate rt = dataEntryService.getReportTemplate(workflowId);
+			TblTemplateSubmit ts = dataEntryService.getTemplateSubmitByOrgIdAndWorkflowId(getSessionUser().getOrgCode(), workflowId);
+
+			StringBuffer orgs = new StringBuffer();// 把机构Id转成机构Name
+			if (StringUtils.isNotEmpty(rt.getSubmitOrg())) {
+				String orgArray[] = rt.getSubmitOrg().split(",");
+				for (int i = 0; i < orgArray.length; i++) {
+					orgs.append(staDimOrgService.getOrgById(orgArray[i]).getName()).append("/");
+				}
+				rt.setSubmitOrg(StringUtils.substringBeforeLast(orgs.toString(), "/"));
+			}
+			StringBuffer roles = new StringBuffer();// 把角色Id转成角色Name
+			if (StringUtils.isNotEmpty(rt.getCheckRole())) {
+				String roleArray[] = rt.getCheckRole().split(",");
+				for (int i = 0; i < roleArray.length; i++) {
+					roles.append(roleMngService.findById(Integer.parseInt(roleArray[i])).getName()).append("/");
+				}
+				rt.setCheckRole(StringUtils.substringBeforeLast(roles.toString(), "/"));
+			}
+			//如果是报表审核，页面下载链接应该是数据报送表中的路径
+			if(WorkFlowNode.TJ_ReportCheck.getId().equals(nodeId)){
+				TblTemplateSubmit sb = dataEntryService.getTemplateSubmitByOrgIdAndWorkflowId(getSessionUser().getOrgCode(), workflowId);
+				rt.setPath(sb.getPath());
+			}
+			
+			if(ts != null){
+				rt.setOperation(ts.getPath());//上传文件回显
+				rt.setReleasePeople(ts.getRealPath());//暂时用此字段代替
+			}
+			
+			return success(rt);
+			
+		} catch (Exception e) {
+			log.error("获取报表模版错误：" + e.getMessage());
+			return failure();
+		}
+	}
+
+	/**
+	 * 上传Excel
+	 * 
+	 * @param req
+	 * @param resp
+	 * @param file
+	 * @return
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/upload", method = RequestMethod.POST)
+	public String uploadExcel(HttpServletRequest request,
+			@RequestParam(value = "filename") MultipartFile file, HttpServletResponse response) throws Exception {
+		log.info("文件上传...");
+		request.setCharacterEncoding("utf-8");  
+        response.setCharacterEncoding("utf-8");
+		response.setContentType("text/html;charset=UTF-8");
+		response.setHeader("Pragma", "No-cache");
+		response.setHeader("Cache-Control", "no-cache");
+		response.setDateHeader("Expires", 0);
+		
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMddHHmmss");
+		Date date = new Date();
+//		String filePath = System.getProperty("user.home")+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT)
+//				+ File.separator + file.getOriginalFilename();//文件完整路径
+		String filePath = PropertiesConstants.getString(PropertiesConstants.USER_HOME)+ PropertiesConstants.getString(PropertiesConstants.DATA_SUBMIT) + File.separator 
+//				+ file.getOriginalFilename().substring(0, file.getOriginalFilename().lastIndexOf(".")) + "_" + sdf.format(date) + "." + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1);//by dz
+				+ date.getTime() + "." + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1);//by dz
+		
+		if (!file.isEmpty()) {
+			FileOutputStream fos = null;
+			try {
+				byte[] bytes = file.getBytes();
+				// 上传后把文件保存到数据库
+				String workflowId = request.getParameter("workflowId");
+				TblTemplateSubmit ts = dataEntryService.getTemplateSubmitByOrgIdAndWorkflowId(getSessionUser().getOrgCode(),workflowId);
+				if(ts != null){
+					fos = new FileOutputStream(filePath);
+					fos.write(bytes);
+					fos.close();
+				//	ts.setPath(file.getOriginalFilename());// 存放路径。这里需要修改
+				//	ts.setPath(file.getOriginalFilename().substring(0, file.getOriginalFilename().lastIndexOf(".")) + "_" + sdf.format(date) + "." + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1));//by dz
+					ts.setPath(file.getOriginalFilename().substring(0, file.getOriginalFilename().lastIndexOf(".")) + "." + file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1));//by dz
+					ts.setRealPath(date.getTime() + ".xlsx");
+					dataEntryService.save(ts);
+				}else{
+					log.error("上传失败，原因：workflowId="+workflowId);
+					try {
+						PrintWriter pw = response.getWriter();
+						pw.write("failure");
+					} catch (IOException ioe) {
+						ioe.printStackTrace();
+					}
+				}
+			} catch (IOException e) {
+				log.error(e.getMessage());
+				try {
+					PrintWriter pw = response.getWriter();
+					pw.write("failure");
+				} catch (IOException ioe) {
+					ioe.printStackTrace();
+				}
+			} 
+		}
+		try {
+			PrintWriter pw = response.getWriter();
+			pw.write("success");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return null;
+	}
+
+	/**
+	 * 下载Excel
+	 * 
+	 * @param fileName
+	 * @param request
+	 * @param response
+	 * @return
+	 * @throws Exception
+	 */
+	@RequestMapping(value = "/download")
+	@ResponseBody
+	public Result downloadExcel(String fileName, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		String filePath = PropertiesConstants.getString(PropertiesConstants.USER_HOME)+ PropertiesConstants.getString(PropertiesConstants.HISTORY_REPORT_PATH)
+				+ File.separator + fileName;//文件完整路径
+		
+		log.info("文件下载...");
+		try {
+			File file = new File(filePath);
+			if (FileUtils.isExists(file)) {
+				FileUtils.downloadFile(new File(filePath), fileName, request,response);
+			} else {
+				log.error("文件不存在！");
+				return failure("文件不存在！");
+			}
+		} catch (IOException e) {
+			log.error("文件下载错误：" + e.getMessage());
+			return failure("下载失败！");
+		}
+		return success("下载成功");
+	}
+
+}

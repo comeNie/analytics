@@ -1,0 +1,57 @@
+package com.orienttech.statics.web.controller.reportResultQuery;
+
+
+
+import org.apache.shiro.SecurityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import com.orienttech.statics.commons.base.BaseController;
+import com.orienttech.statics.commons.datatables.DataTablesPage;
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.service.reportResultQuery.ReportResultQueryService;
+@RequestMapping("/reportResultQuery")
+@Controller
+public class ReportResultQueryController extends BaseController {
+	
+	@Autowired ReportResultQueryService reportResultQueryService;
+	/**
+	 * 根据报表类型加载不同的页面
+	 * @param type	JSP名称
+	 * @param model
+	 * @return
+	 */
+	@RequestMapping
+	public String index(@RequestParam(defaultValue="")String type,Model model){
+		SessionUser sUser = (SessionUser) SecurityUtils.getSubject().getPrincipal();
+		String loginName = sUser.getUserName();
+		model.addAttribute("loginName", loginName);
+		return "/reportResultQuery/"+type;
+	}
+	/**
+	 * 
+	 * @param pageNumber
+	 * @param pageSize
+	 * @param sEcho
+	 * @param reportName
+	 * @param reportCycle
+	 * @param releaseTimeBegin
+	 * @param releaseTimeEnd
+	 * @param releasePeople
+	 * @return
+	 */
+	@RequestMapping(value="/queryReportResult",method=RequestMethod.POST)
+	@ResponseBody
+	public DataTablesPage queryReportResult(@RequestParam("start") Integer pageNumber,
+			@RequestParam("length") Integer pageSize, Integer sEcho, String reportName,
+			 String reportCycle, String sumTimeBegin, String sumTimeEnd, String sumPeople) {
+		Page<Object[]> page = reportResultQueryService.queryReportResult(pageNumber/pageSize + 1, pageSize, reportName, reportCycle, sumTimeBegin, sumTimeEnd, sumPeople);
+		return new DataTablesPage(sEcho, page);
+	}
+}

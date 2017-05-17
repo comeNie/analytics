@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd">
+
+	<description>定时任务</description>
+	<!-- 线程执行器配置，用于任务注册 -->
+	<bean id="taskExecutor" class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="10" />
+		<property name="maxPoolSize" value="100" />
+		<property name="queueCapacity" value="500" />
+	</bean>
+	
+	<!--业务对象 -->
+	<bean id="yearReportTask" class="com.orienttech.statics.service.timedtask.YearReportTask" />
+	<bean id="halfYearReportTask" class="com.orienttech.statics.service.timedtask.HalfYearReportTask" />
+	<bean id="seasonReportTask" class="com.orienttech.statics.service.timedtask.SeasonReportTask" />
+	<bean id="monthReportTask" class="com.orienttech.statics.service.timedtask.MonthReportTask" />
+	<bean id="tenDayReportTask" class="com.orienttech.statics.service.timedtask.TenDayReportTask" />
+	<bean id="weekReportTask" class="com.orienttech.statics.service.timedtask.WeekReportTask" />
+
+	<!--调度年报业务 -->
+	<bean id="yearReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="yearReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="yearReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="yearReportJob" />
+ 		<property name="cronExpression" value="0 0 0 L 12 ?" /><!-- 每年12月31号凌晨0点触发  -->
+	</bean>
+	
+	<!--调度半年报业务 -->
+	<bean id="halfYearReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="halfYearReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="halfYearReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="halfYearReportJob" />
+ 		<property name="cronExpression" value="0 0 0 L 6,12 ?" /> <!-- 每年6月30号和12月31号的凌晨0点触发 -->
+	</bean>
+	
+	<!--调度季报业务 -->
+	<bean id="seasonReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="seasonReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="seasonReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="seasonReportJob" />
+		<property name="cronExpression" value="0 0 0 L 2,5,8,11 ?" /><!-- 当月最后一天凌晨0点发一次，后每隔三个月的最后一天凌晨0点触发 -->
+	</bean>
+	
+	<!--调度月报业务 -->
+	<bean id="monthReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="monthReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="monthReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="monthReportJob" />
+		<property name="cronExpression" value="0 0 0 L * ? *" /><!-- 每月最后一天凌晨0点触发 -->
+	</bean>
+	
+	<!--调度旬报业务(上旬和中旬) -->
+	<bean id="tenDayReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="tenDayReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="tenDayReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="tenDayReportJob" />
+		<property name="cronExpression" value="0 0 0 10,20 * ? *" /><!-- 每月10号、20号凌晨0点触发 -->
+	</bean>
+	
+	<!--调度旬报业务(下旬) -->
+	<bean id="tenDayReportJobLast"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="tenDayReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="tenDayReportTriggerLast"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="tenDayReportJobLast" />
+		<property name="cronExpression" value="0 0 0 L * ? *" /><!-- 每月最后一天凌晨0点触发 -->
+	</bean>
+	
+	
+	
+	<!--调度周报业务 -->
+	<bean id="weekReportJob"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<property name="targetObject" ref="weekReportTask" />
+		<property name="targetMethod" value="doBiz" />
+	</bean>
+	<bean id="weekReportTrigger"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="weekReportJob" />
+		<property name="cronExpression" value="0 0 0 ? * L" /><!-- 每周六晚上凌晨0点触发 -->
+	</bean>
+	<!-- 设置调度 -->
+	<bean id="scheduler"
+		class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="triggers">
+			<list>
+				<ref bean="yearReportTrigger" />
+				<ref bean="halfYearReportTrigger" />
+				<ref bean="seasonReportTrigger" />
+				<ref bean="monthReportTrigger" />
+				<ref bean="tenDayReportTrigger" />
+				<ref bean="tenDayReportTriggerLast" />
+				<ref bean="weekReportTrigger" />
+			</list>
+		</property>
+		<property name="taskExecutor" ref="taskExecutor" />
+	</bean>
+</beans>

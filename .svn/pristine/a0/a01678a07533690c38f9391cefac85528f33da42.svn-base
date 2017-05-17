@@ -1,0 +1,25 @@
+define(function(require, exports, module) {
+	var rm = {
+		rules:{
+			uploadFile:{
+				required: true,
+				extension:"xlsx"
+			},
+//			lendAmt:{
+//				isPositiveNumberTwo: true
+//			},
+//			lengBalance:{
+//				isPositiveNumberTwo: true
+//			}
+			
+		},
+		messages:{
+			uploadFile:{
+				required: "请上传文件",
+				extension:"只允许上传后缀名为.xlsx的文件！"
+			}
+			
+		}
+	};
+	module.exports = rm;
+});

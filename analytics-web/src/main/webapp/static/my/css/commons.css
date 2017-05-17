@@ -1,0 +1,68 @@
+body, h1, h2, h3, h4, h5, h6 {
+	font-family: "Microsoft YaHei";
+}
+
+.my-button-group {
+	float: right;
+}
+
+.nav-list > li > a > .menu-icon {
+    vertical-align: middle;
+
+}
+
+.chosen-container-multi .chosen-choices li.search-field input[type="text"]{
+		font-family: Microsoft YaHei;
+		font-size: 14px;
+		height: 32px;
+
+}
+
+.ace-settings-box.open {
+    border-width: 2px;
+    max-height: 1000px;
+    max-width: 400px;
+    padding: 0 14px;
+    transition-delay: 0s;
+}
+<%-- 待办已办页面css--%>
+.form-horizontal .form-group {margin-left: -12px\0;margin-right: -12px\0;}
+	.form-group {margin-bottom: 15px\0;}
+	.col-sm-2 {width: 16.6666%\0;}
+	.col-sm-4 { width: 33.3333%\0;}
+	.form-horizontal .control-label {text-align: right\0;}
+	.no-padding-right {padding-right: 0\0;}
+	.col-sm-1, .col-sm-2, .col-sm-3, .col-sm-4, .col-sm-5, .col-sm-6, .col-sm-7, .col-sm-8, .col-sm-9, .col-sm-10, .col-sm-11, .col-sm-12 {float: left\0;}
+	.col-xs-1, .col-sm-1, .col-md-1, .col-lg-1, .col-xs-2, .col-sm-2, .col-md-2, .col-lg-2, .col-xs-3, .col-sm-3, .col-md-3, .col-lg-3, .col-xs-4, .col-sm-4, .col-md-4, .col-lg-4, .col-xs-5, .col-sm-5, .col-md-5, .col-lg-5, .col-xs-6, .col-sm-6, .col-md-6, .col-lg-6, .col-xs-7, .col-sm-7, .col-md-7, .col-lg-7, .col-xs-8, .col-sm-8, .col-md-8, .col-lg-8, .col-xs-9, .col-sm-9, .col-md-9, .col-lg-9, .col-xs-10, .col-sm-10, .col-md-10, .col-lg-10, .col-xs-11, .col-sm-11, .col-md-11, .col-lg-11, .col-xs-12, .col-sm-12, .col-md-12, .col-lg-12 {
+	    min-height: 1px\0;
+	    padding-left: 12px\0;
+	    padding-right: 12px\0;
+	    position: relative\0;
+	}
+	label {font-size: 14px\0;font-weight: normal\0;}
+	<%-- 查询条件css--%>
+	.lbl{
+		display: inline;
+		padding: .2em .6em .3em;
+		font-size: 100%;
+		line-height: 1;
+		text-align: center;
+		white-space: nowrap;
+		vertical-align: baseline;
+	}
+	.lbluncheck{cursor: pointer;}
+	.lblchecked{
+		background-color: #5bc0de;
+		display: inline;
+		padding: .2em .6em .3em;
+		font-size: 100%;
+		font-weight: 700;
+		line-height: 1;
+		color: #fff;
+		text-align: center;
+		white-space: nowrap;
+		vertical-align: baseline;
+		border-radius: .25em;
+	}
+	.search_conditions b{font-size: 14px;}
+	/* .widget-toolbar{float : left;} */ 

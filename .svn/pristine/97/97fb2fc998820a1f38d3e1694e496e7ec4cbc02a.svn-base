@@ -1,0 +1,32 @@
+package com.orienttech.statics.service.usermng;
+
+import java.util.List;
+
+import com.orienttech.statics.service.model.usermng.OrgDeptBo;
+import com.orienttech.statics.service.model.usermng.OrgNodeBo;
+
+public interface OrgDeptService {
+	
+	/**
+	 * @param orgId
+	 * @return
+	 */
+	public List<OrgDeptBo> findOrgDeptListByOrgId(String orgId);
+
+	String findOrgNametListByOrgId(String orgId);
+
+	/**
+	 * 读取当前节点下的第二层父节点下的所有子节点
+	 * @param orgId
+	 * @return
+	 */
+	List<OrgNodeBo> findOrgDeptBySelfOrgId(String orgId);
+
+	List<OrgDeptBo> findOrgDeptListForHistoryReport(String orgId);
+	
+	List<OrgDeptBo> findFundSource();
+	
+	String findOrgNameByOrgId(String orgId);
+	
+	String findOrgIdByOrgName(String orgName);
+}

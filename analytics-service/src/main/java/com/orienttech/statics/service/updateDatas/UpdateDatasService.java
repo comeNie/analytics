@@ -1,0 +1,63 @@
+package com.orienttech.statics.service.updateDatas;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
+import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.dao.entity.FinancialLedgerDetails;
+
+
+public interface UpdateDatasService {
+	/**
+	 * 上传Excel
+	 * @param myfile
+	 * @return
+	 * @author wangxy 20160304
+	 */
+	public String uploadExcel(MultipartFile myfile);
+	/**
+	 * 更新录入
+	 * @return
+	 * @throws FileNotFoundException
+	 * @throws IOException
+	 * @author wangxy 20160304
+	 */
+	String importDatas(String flag) throws FileNotFoundException, IOException;
+	/**
+	 * 获取datatables数据
+	 * @param pageNumber
+	 * @param pageSize
+	 * @return
+	 * @author wangxy 20160304
+	 */
+	Page<Object[]> findAllDatas(Integer pageNumber, Integer pageSize, String search);
+	/**
+	 * 修改数据
+	 * @param fld
+	 * @return
+	 * @author wangxy 20160307
+	 */
+	public String modifyDatas(FinancialLedgerDetails fld);
+	/**
+	 * 删除数据
+	 * @param rowNum
+	 * @return
+	 * @author wangxy 20160307
+	 */
+	public String deleteData(Integer rowNum);
+	/**
+	 * 新增数据
+	 * @param fld
+	 * @return
+	 * @author wangxy 20160307
+	 */
+	public String add(FinancialLedgerDetails fld);
+	
+	public String exportExcel();
+	
+	public String getMaxRowNum();
+	
+}
+

@@ -1,0 +1,486 @@
+package com.orienttech.statics.service.updateDatas.impl;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFDataFormat;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.orm.hibernate3.HibernateSystemException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.orienttech.statics.commons.dynamicquery.DynamicQuery;
+import com.orienttech.statics.commons.utils.CommonHelper;
+import com.orienttech.statics.commons.utils.FileUtils;
+import com.orienttech.statics.commons.utils.PropertiesConstants;
+import com.orienttech.statics.dao.FinancialLedgerDetailsDao;
+import com.orienttech.statics.dao.entity.FinancialLedgerDetails;
+import com.orienttech.statics.service.updateDatas.UpdateDatasService;
+import com.orienttech.statics.service.usermng.OrgDeptService;
+
+@Service
+public class UpdateDatasServiceImpl implements UpdateDatasService {
+	
+	@Autowired
+	private FinancialLedgerDetailsDao financialLedgerDetailsDao;
+	@Autowired
+	private DynamicQuery dynamicQuery;
+	@Autowired
+	private OrgDeptService orgDeptService;
+	
+	@Override
+	public String uploadExcel(MultipartFile myfile) {
+		String flag = "OK";
+		if (myfile != null && !myfile.isEmpty()) {//文件内容不为空
+			// 服务器路径
+			String serverPath = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.DATA_UPDATE_DATAS) + File.separator;
+			String fileName = "资金拆借表.xlsx";
+			String finalPath = serverPath + fileName;
+			try {
+				// 判断文件目录是否存在
+				File director = new File(serverPath);
+				if (!FileUtils.isExists(director)) {
+					director.mkdirs();// 如果不存在，则新建文件目录
+				}
+				FileOutputStream fos = new FileOutputStream(finalPath);
+				// FileUtils.outputFile(file, fos);//上传模板文件
+				FileUtils.outputFile(myfile.getBytes(), fos);// 上传模板文件
+			} catch (FileNotFoundException e) {
+				flag = "上传文件错误，请联系系统管理员！";
+				e.printStackTrace();
+				throw new RuntimeException("上传文件错误，请联系系统管理员！");
+			} catch (IOException e) {
+				flag = "上传文件错误，请联系系统管理员！";
+				e.printStackTrace();
+				throw new RuntimeException("上传文件错误，请联系系统管理员！");
+			}
+		}else{
+			flag = "文件不存在！";
+			return flag;
+		}
+		return flag;
+	}
+
+	@Override
+	@Transactional
+	public String importDatas(String flag) throws FileNotFoundException, IOException {
+		
+		String serverPath = PropertiesConstants.getString(PropertiesConstants.USER_HOME) + PropertiesConstants.getString(PropertiesConstants.DATA_UPDATE_DATAS) + File.separator;
+		String filename = serverPath + "资金拆借表.xlsx";
+		try{
+			new XSSFWorkbook(new FileInputStream(filename));
+		}catch(Exception e){
+			e.printStackTrace();
+			if(e!=null){
+				flag = "文件上传有误！";
+				return flag;
+			}
+		}
+		
+		XSSFWorkbook loanWb = new XSSFWorkbook(new FileInputStream(filename));
+		XSSFSheet loanSheet = loanWb.getSheetAt(0);
+		XSSFRow row;
+		XSSFCell cell;
+		int rowCount = loanSheet.getLastRowNum();//行数
+		
+		List<FinancialLedgerDetails> dataList = new ArrayList<FinancialLedgerDetails>();
+		
+		for(int i = 0;i <= rowCount; i++){//遍历行
+			row = loanSheet.getRow(i+1);//从第二行收集数据
+			if(row != null){
+//				int icount = row.getLastCellNum();//每列单元格数
+				FinancialLedgerDetails fld = new FinancialLedgerDetails();
+				for(int j = 0; j < 17; j++){
+					cell = row.getCell((short) j, Row.CREATE_NULL_AS_BLANK);
+					SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+					String strValue = "";
+					double numCell = 0;
+					switch(cell.getCellType()){
+						case XSSFCell.CELL_TYPE_FORMULA:
+							numCell = cell.getNumericCellValue();
+							break;
+						case XSSFCell.CELL_TYPE_STRING:
+							strValue = cell.getStringCellValue();
+							break;
+						case XSSFCell.CELL_TYPE_NUMERIC:
+							if(HSSFDateUtil.isCellDateFormatted(cell)){
+								Date date = cell.getDateCellValue();
+								strValue = sdf.format(date);
+							}else{
+								numCell = cell.getNumericCellValue();
+							}
+				            break;
+				        case XSSFCell.CELL_TYPE_BLANK:
+				        	strValue = "";
+				            break;
+				        default:
+				        	strValue = "";
+				            break;
+					}
+					
+					switch(j){
+		   				case 0 : fld.setRowNum((int)numCell);break;//序号
+		   				case 1 : fld.setOrgName(strValue);break;//机构名称
+		   				case 2 : fld.setLendForm(strValue);break;//拆借形式
+		   				case 3 : fld.setLendAmt(new BigDecimal(numCell));break;//拆借金额
+		   				case 4 : fld.setLengBalance(new BigDecimal(numCell));break;//拆借余额
+		   				case 5 : fld.setFinancingForm(strValue);break;//融资方式
+		   				case 6 : fld.setPlatformInstitution(strValue);break;//平台机构
+		   				case 7 : fld.setCashSourceName(strValue);break;//资金来源与运用
+		   				case 8 : try {
+		   							if(!strValue.equals("")){
+		   								fld.setBeginDate(sdf.parse(strValue));
+		   							}
+								} catch (ParseException e) {
+									e.printStackTrace();
+									flag = "格式转换错误！第"+(i+2)+"行，第"+(j+1)+"列。";
+									return flag;
+								}
+		   						break;//起息日
+		   				case 9 : try {
+				   					if(!strValue.equals("")){
+				   						fld.setArriveDate(sdf.parse(strValue));
+				   					}
+		   						} catch (ParseException e) {
+		   							e.printStackTrace();
+		   							flag = "格式转换错误！第"+(i+2)+"行，第"+(j+1)+"列。";
+		   							return flag;
+		   						}
+		   						break;//到期日
+		   				case 10 : fld.setContractTerm((int)numCell);break;//期限
+		   				case 11 : fld.setContractRate(new BigDecimal(numCell));break;//利率
+		   				case 12 : fld.setIncomeExpense(new BigDecimal(numCell));break;//预期收益与支出
+		   				case 13 : fld.setFundingSources(strValue);break;//资金来源渠道
+		   				case 14 : fld.setGuaranteeMode(strValue);break;//担保方式
+		   				case 15 : fld.setGuarantor(strValue);break;//担保方
+		   				case 16 : fld.setMemo(strValue);break;//备注
+		   				default : 
+		   						flag = "文档上传有误，超出列范围。";
+		   						return flag;
+					}
+				}
+				dataList.add(fld);
+			}
+		}
+		
+		if(dataList.size()>0 && dataList != null){
+			try{
+//				financialLedgerDetailsDao.deleteAll();//清空数据库所有数据
+				financialLedgerDetailsDao.truncateAll();
+			}catch(Exception e){
+				e.printStackTrace();
+				flag = "清空表错误！";
+				return flag;
+			}
+			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+			String now = sdf.format(new Date());
+			Date operateTime = null;
+			try {
+				operateTime = sdf.parse(now);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+			
+			for(FinancialLedgerDetails fld : dataList){
+				fld.setOperateTime(operateTime);//操作时间
+				String orgName = fld.getOrgName();
+				if(orgName.equals("天津邦信")){
+					orgName = "天津小贷";
+				}
+				String orgId = orgDeptService.findOrgIdByOrgName(orgName);
+				if(orgName.equals("东方邦信")){
+					fld.setOrgId("10001");
+				}else{
+					fld.setOrgId(orgId);
+				}
+				try{
+					financialLedgerDetailsDao.save(fld);
+					
+				}catch(HibernateSystemException e){
+					e.printStackTrace();
+					flag = "数据库中唯一标识重复！row_num="+fld.getRowNum();
+					return flag;
+				}
+			}
+			
+		}else{
+			flag = "上传文件无数据！";
+			return flag;
+		}
+		
+		return flag;
+	}
+
+	@Override
+	public Page<Object[]> findAllDatas(Integer pageNumber, Integer pageSize, String search) {
+		StringBuffer sql = new StringBuffer("select t.row_num,t.org_id,t.org_name,t.lend_form,t.LEND_AMT,t.LENG_BALANCE,t.FINANCING_FORM,"
+				+ " t.PLATFORM_INSTITUTION,t.CASH_SOURCE_NAME,t.BEGIN_DATE,t.ARRIVE_DATE,t.CONTRACT_TERM,t.CONTRACT_RATE,t.INCOME_EXPENSE,"
+				+ " t.FUNDING_SOURCES,t.GUARANTEE_MODE,t.GUARANTOR,t.memo,t.operate_time "
+				+ " from financial_ledger_details t where 1=1 ");
+		
+		String regx = "^[0-9]*$";
+		Pattern pat = Pattern.compile(regx);
+		Matcher mat = pat.matcher(String.valueOf(search));
+		
+		if (StringUtils.isNotEmpty(search)) {
+			if (mat.find()) {//根据row_num查询
+				sql.append(" and t.row_num ='"+Integer.parseInt(search)+"'");
+			}else{//根据org_name查询
+				sql.append(" and t.org_name like '%"+search+"%'");
+			}
+		}
+		sql.append(" order by t.row_num desc");
+		
+		return dynamicQuery.nativeQuery(Object[].class, new PageRequest(
+				pageNumber - 1, pageSize), sql.toString());
+	}
+
+	@Override
+	public String modifyDatas(FinancialLedgerDetails fld) {
+		String flag = "OK";
+		try{
+			financialLedgerDetailsDao.save(fld);
+		}catch(Exception e){
+			e.printStackTrace();
+			flag = "保存数据失败！";
+			return flag;
+		}
+		return flag;
+		
+	}
+
+	@Override
+	public String deleteData(Integer rowNum) {
+		String flag = "删除成功！";
+		try{
+			financialLedgerDetailsDao.delete(rowNum);
+		}catch(Exception e){
+			flag = "删除失败！";
+		}
+		return flag;
+	}
+
+	@Override
+	public String add(FinancialLedgerDetails fld) {
+		String flag = "保存成功！";
+		try{
+			financialLedgerDetailsDao.save(fld);
+		}catch(Exception e){
+			e.printStackTrace();
+			flag = "保存失败！";
+		}
+		return flag;
+	}
+
+	@Override
+	public String exportExcel() {//TODO
+		
+		StringBuffer sb = new StringBuffer("select * from financial_ledger_details t order by t.row_num");
+		List<Object[]> objList = dynamicQuery.nativeQuery(Object[].class, sb.toString());
+		if(objList.size()<1 || objList == null){
+			return null;
+		}
+		
+		List<FinancialLedgerDetails> list = new ArrayList<FinancialLedgerDetails>();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+		
+		for(Object[] obj : objList){
+			int index = 0;
+			Integer rowNum = CommonHelper.toInt(obj[index++]);
+			String orgId = CommonHelper.toStr(obj[index++]);
+			String orgName = CommonHelper.toStr(obj[index++]);
+			String lendForm = CommonHelper.toStr(obj[index++]);
+			BigDecimal lendAmt = CommonHelper.toBigDecimal(obj[index++]);
+			BigDecimal lengBalance = CommonHelper.toBigDecimal(obj[index++]);
+			String financingForm = CommonHelper.toStr(obj[index++]);
+			String platformInstitution = CommonHelper.toStr(obj[index++]);
+			String cashSourceName = CommonHelper.toStr(obj[index++]);
+			Date beginDate = null;
+			Date arriveDate = null;
+			try {
+				Object ob1 = obj[index++];
+				beginDate = ob1==null?beginDate:sdf.parse(sdf.format(ob1));
+				Object ob2 = obj[index++];
+				arriveDate = ob2==null?arriveDate:sdf.parse(sdf.format(ob2));
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
+			int contractTerm = CommonHelper.toInt(obj[index++]);
+			BigDecimal contractRate = CommonHelper.toBigDecimal(obj[index++]);
+			BigDecimal incomeExpense = CommonHelper.toBigDecimal(obj[index++]);
+			String fundingSources = CommonHelper.toStr(obj[index++]);
+			String guaranteeMode = CommonHelper.toStr(obj[index++]);
+			String guarantor = CommonHelper.toStr(obj[index++]);
+			String memo = CommonHelper.toStr(obj[index++]);
+			
+			FinancialLedgerDetails fld = new FinancialLedgerDetails();
+			fld.setRowNum(rowNum);
+			fld.setOrgId(orgId);
+			fld.setOrgName(orgName);
+			fld.setLendForm(lendForm);
+			fld.setLendAmt(lendAmt);
+			fld.setLengBalance(lengBalance);
+			fld.setFinancingForm(financingForm);
+			fld.setPlatformInstitution(platformInstitution);
+			fld.setCashSourceName(cashSourceName);
+			fld.setBeginDate(beginDate);
+			fld.setArriveDate(arriveDate);
+			fld.setContractTerm(contractTerm);
+			fld.setContractRate(contractRate);
+			fld.setIncomeExpense(incomeExpense);
+			fld.setFundingSources(fundingSources);
+			fld.setGuaranteeMode(guaranteeMode);
+			fld.setGuarantor(guarantor);
+			fld.setMemo(memo);
+			
+			list.add(fld);
+		}
+		/**
+		 * 写入Excel
+		 */
+		SimpleDateFormat sdf1 = new SimpleDateFormat("yyyyMMddHHmmss");
+		Date date = new Date();
+		String fileName = PropertiesConstants.getString(PropertiesConstants.USER_HOME)+ PropertiesConstants.getString(PropertiesConstants.DATA_UPDATE_DATAS)+ File.separator + sdf1.format(date) + ".xlsx";
+		FileOutputStream fos = null;
+		try {
+			fos = new FileOutputStream(fileName);
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		
+		XSSFWorkbook wbTarget = new XSSFWorkbook();
+		Sheet sheet = wbTarget.createSheet();
+		XSSFRow row = null;
+		XSSFCell cell = null;
+		
+		//日期格式
+		XSSFCellStyle dateCellStyle = wbTarget.createCellStyle();
+		XSSFDataFormat format = wbTarget.createDataFormat();
+        short fmt = format.getFormat("yyyy/MM/dd");
+        dateCellStyle.setDataFormat(fmt);
+        
+		for(int i = 0;i<=list.size();i++){
+			row = (XSSFRow)sheet.createRow(i);
+			for(int j=0;j<18;j++){
+				cell = row.createCell(j);
+				if(i==0){//表头
+					switch(j){
+						case 0 : cell.setCellValue("序号");break;
+						case 1 : cell.setCellValue("机构号");break;
+						case 2 : cell.setCellValue("机构名");break;
+						case 3 : cell.setCellValue("拆借形式");break;
+						case 4 : cell.setCellValue("拆借金额");break;
+						case 5 : cell.setCellValue("拆借余额");break;
+						case 6 : cell.setCellValue("融资方式");break;
+						case 7 : cell.setCellValue("平台机构");break;
+						case 8 : cell.setCellValue("资金来源与运用");break;
+						case 9 : cell.setCellValue("起息日");break;
+						case 10 : cell.setCellValue("到期日");break;
+						case 11 : cell.setCellValue("期限");break;
+						case 12 : cell.setCellValue("利率");break;
+						case 13 : cell.setCellValue("预期收益与支出");break;
+						case 14 : cell.setCellValue("资金来源渠道");break;
+						case 15 : cell.setCellValue("担保方式");break;
+						case 16 : cell.setCellValue("担保方");break;
+						case 17 : cell.setCellValue("备注");break;
+					}
+				}else{
+					FinancialLedgerDetails fld = list.get(i-1);
+					switch(j){
+						case 0 : cell.setCellValue(list.get(i-1).getRowNum());break;
+						case 1 : cell.setCellValue(fld.getOrgId());break;
+						case 2 : cell.setCellValue(list.get(i-1).getOrgName());break;
+						case 3 : cell.setCellValue(list.get(i-1).getLendForm());break;
+						case 4 : 
+								if(fld.getLendAmt() != null){
+									cell.setCellValue(fld.getLendAmt().doubleValue());
+								}
+								break;
+						case 5 : 
+								if(fld.getLengBalance() != null){
+									cell.setCellValue(fld.getLengBalance().doubleValue());
+								}
+								break;
+						case 6 : cell.setCellValue(list.get(i-1).getFinancingForm());break;
+						case 7 : cell.setCellValue(list.get(i-1).getPlatformInstitution());break;
+						case 8 : cell.setCellValue(list.get(i-1).getCashSourceName());break;
+						case 9 : 
+								Date date1 = list.get(i-1).getBeginDate();
+								if(date1 != null){
+									cell.setCellStyle(dateCellStyle);
+									cell.setCellValue(date1);
+								}
+								break;
+						case 10 : 
+								Date date2 = list.get(i-1).getArriveDate();
+								if(date2 != null){
+									cell.setCellStyle(dateCellStyle);
+									cell.setCellValue(date2);
+								}
+								break;
+						case 11 : cell.setCellValue(list.get(i-1).getContractTerm());break;
+						case 12 : 
+								if(fld.getContractRate() != null){
+									cell.setCellValue(fld.getContractRate().doubleValue());
+								}
+								break;
+						case 13 : 
+								if(fld.getIncomeExpense() != null){
+									cell.setCellValue(fld.getIncomeExpense().doubleValue());
+								}
+								break;
+						case 14 : cell.setCellValue(list.get(i-1).getFundingSources());break;
+						case 15 : cell.setCellValue(list.get(i-1).getGuaranteeMode());break;
+						case 16 : cell.setCellValue(list.get(i-1).getGuarantor());break;
+						case 17 : cell.setCellValue(list.get(i-1).getMemo());break;
+					}
+				}
+			}
+		}
+		
+		try {
+			wbTarget.write(fos);
+			fos.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		return fileName;
+	}
+
+	@Override
+	public String getMaxRowNum() {
+		StringBuffer sb = new StringBuffer("select max(row_num) from financial_ledger_details");
+		List<Object[]> list = dynamicQuery.nativeQuery(sb.toString());
+		if(CollectionUtils.isEmpty(list)){
+			return null;
+		}
+		String rowNum = CommonHelper.toStr(list.get(0));
+		return rowNum;
+		
+	}
+}

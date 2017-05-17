@@ -1,0 +1,171 @@
+define(function(require, exports, module) {
+	var model = require("./model");
+	var utils = require("utils");
+	var getCycle = function(name){
+		 var data;
+			if(name==1){
+     		data="一次性填报";
+     	} else if(name==2){
+     		data="年报";
+     	} else if(name==3){
+     		data="半年报";
+     	} else if(name==4){
+     		data="季报";
+     	} else if(name==5){
+     		data="月报";
+     	} else if(name==6){
+     		data="旬报";
+     	} else if(name==7){
+     		data="周报";
+     	} else {
+     		data="无";
+     	}
+			return data;
+	};
+	var getSumType = function(data){
+		if(data==1){
+			return "按行汇总";
+		} else if(data==2){
+			return "按页汇总";
+		}else{
+			return "无";
+		}
+	};
+	var getTemplateState = function(data){
+		if(data==1){
+    		return "未提交";
+    	}else if(data==10){
+    		return "未提交";
+    	}else if(data==2){
+    		return "部门审核";
+    	} else if(data==3){
+    		return "统计组审核";
+    	} else if(data==4){
+    		return "负责人审核";
+    	}else if(data==9){
+    		return "模板发布";
+    	} else if(data==5){
+//    		return "已发布";
+    		return "报表收集（已发布）";
+    	} else if(data==6){
+    		return "已失效";
+    	} else if(data==7){
+    		return "暂停执行";
+    	}else if(data==8){
+    		return "已退回";
+    	} else {
+    		return "无";
+    	} 
+	};
+	var view = Backbone.View.extend({
+		el: "div.ajax-content",
+		initialize:function(){
+			this.model=new model();
+		},
+		events:{
+//			"click button[role='detail']":"detail",//
+			"click #btn-search":"search",
+			"click button[role='create']":"reportCreate",
+			"click button[role='edit']":"reportEdit",//templateEdit
+			"click #btn-doSearch": "doEdit"
+		},
+		render:function(){
+			this.initDataTables();
+		},
+		reportEdit: function(e) {
+			var viewSelf = this;
+			var $btn=$(e.currentTarget);
+			var desc = $btn.data('desc');
+			var id = $btn.data('id');
+			
+			$("#description").val(desc);
+			$("#mobileId").val(id);
+			
+			$("#condition-win").modal("show");
+		},
+		doEdit: function() {
+			var description = $("#description").val();
+			var mobileId = $("#mobileId").val();
+			$.ajax({
+		        type:'POST',
+		        url:$$ctx + "/mobileReport/saveDesc",  //JS访问Controller中方法,有返回值
+		        data:{
+		        	description:description,
+		        	mobileId:mobileId
+		        },
+		        contentType: "application/x-www-form-urlencoded; charset=utf-8",
+		        success:function(result){
+		            bootbox.alert("<span style='font-size:16px;'>保存成功.</span>");
+		        }
+		    });
+			this.dt.api().draw();
+			$("#condition-win").modal("hide");
+		},
+		reportCreate: function() {
+			var viewSelf = this;
+			var self = $(this);
+			window.location.href = $$ctx + "/main#mobileReport/reportCreate?type=mobileReportCreate";
+		},
+		search:function(){
+			var viewSelf = this;
+			var oSearchData = {};
+			oSearchData.beginTime = $("#begin-time").val();
+			oSearchData.endTime = $("#end-time").val();
+			oSearchData.reportDesc = $("#report-desc").val();
+			oSearchData.submitPersonName = $("#submitPersonName").val();
+			viewSelf.dt.oSearchData=oSearchData;//查询条件
+			viewSelf.dt.fnPageChange(0);
+		},
+		initDataTables:function(){
+			var viewSelf = this;
+			var dt = $("#tbl").dataTable({
+				bServerSide: true, 
+				searching: false,
+			    ordering:  false,
+			    lengthMenu : [ [ 10, 20, 50,100 ], [ 10, 20, 50, 100 ] ],// 每页显示多少条记录
+				ajax: {
+					type : "POST",
+					url : $$ctx + "/mobileReport/queryReports",
+					data :function(params) {
+						if(viewSelf.dt&&viewSelf.dt.oSearchData) {//循环遍历查询条件
+							 for(var key in viewSelf.dt.oSearchData) {
+								 params[key]=viewSelf.dt.oSearchData[key];
+					         }
+						}
+					}
+				},
+				columns : [
+				    {data : null },
+				    {data : [1] },
+//			        {data : [2] },
+			        {data : [3] },
+			        {data : null ,render : function(data,type,row) {
+			        	if(row[4]==null){
+			        		return "";
+			        	}else{
+			        		var date = new Date(parseInt(row[4]));//.toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ");
+				        	var month = date.getMonth()+1;
+				        	return date.getFullYear()+"-"+(month<10?(+"0"+month.toString()):month)+"-"+date.getDate();
+			        	}
+			        } },
+			        {data : [5] },
+			        {data : [6] },
+			        {data : "", render: function(data, type, row) {
+			        	var div = $("<div class='btn-group'></div>");
+//			        	var button1 = $("<button role='detail' data-desc='"+row[2]+"' class='btn btn-xs btn-info glyphicon glyphicon-eye-open' title='查看摘要'></button>");
+			        	var button2 = $("<button role='edit' data-id='"+row[0]+"' data-desc='"+row[2]+"' class='btn btn-xs btn-info glyphicon glyphicon-edit' title='修改'></button>");
+				        div.append(button2);
+//				        .append(button2);
+						return div[0].outerHTML;
+	                }}
+			    ],
+			    fnCreatedRow : function(nRow, aData, iDataIndex) {//序号
+		    		$('td:eq(0)', nRow).html(iDataIndex + 1);
+		        }
+			});
+			
+			viewSelf.dt = dt;
+		}
+	});
+	module.exports = view;
+});

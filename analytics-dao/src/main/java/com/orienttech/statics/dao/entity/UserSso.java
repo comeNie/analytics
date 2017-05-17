@@ -1,0 +1,119 @@
+package com.orienttech.statics.dao.entity;
+
+import static com.orienttech.statics.commons.utils.Contants.TJ_SCHEMA;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.SequenceGenerator;
+import javax.persistence.Table;
+
+import com.orienttech.statics.commons.entity.BaseEntity;
+
+/**
+ * 用户与门户集成（）
+ *
+ */
+@Entity
+@Table(name = "TB_USER_SSO", schema = TJ_SCHEMA)
+public class UserSso extends BaseEntity {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 6872424412924383366L;
+	@Id
+	@SequenceGenerator(name = "generator", sequenceName="SEQ_USER_SSO", allocationSize = 1)
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "generator")
+	@Column(name="USER_ID")
+	private Long userId;
+	@Column(name="LOGIN_NAME",length=20)
+	private String loginName;
+	@Column(name="USER_NAME",length=50)
+	private String userName;
+	@Column(name="PASSWORD",length=200)
+	private String password;
+	@Column(name="EMAIL")
+	private String email;
+	@Column(name="SSO_ID")
+	private String ssoId;
+	@Column(name="USER_STATUS",length=1)
+	private String userStatus="0";
+	@Column(name="ROLE_ID")
+	private String roleId;
+	@Column(name="ORG_CODE")
+	private String orgCode;
+	@Column(name="OTHER_ORG_CODE",length=100)
+	private String otherOrgCode;
+	
+	
+	public String getOtherOrgCode() {
+		return otherOrgCode;
+	}
+	public void setOtherOrgCode(String otherOrgCode) {
+		this.otherOrgCode = otherOrgCode;
+	}
+	public Long getUserId() {
+		return userId;
+	}
+	public void setUserId(Long userId) {
+		this.userId = userId;
+	}
+	public String getLoginName() {
+		return loginName;
+	}
+	public void setLoginName(String loginName) {
+		this.loginName = loginName;
+	}
+	public String getUserName() {
+		return userName;
+	}
+	public void setUserName(String userName) {
+		this.userName = userName;
+	}
+	public String getPassword() {
+		return password;
+	}
+	public void setPassword(String password) {
+		this.password = password;
+	}
+	public String getRoleId() {
+		return roleId;
+	}
+	public void setRoleId(String roleId) {
+		this.roleId = roleId;
+	}
+	public String getOrgCode() {
+		return orgCode;
+	}
+	public void setOrgCode(String orgCode) {
+		this.orgCode = orgCode;
+	}
+	public String getEmail() {
+		return email;
+	}
+	public void setEmail(String email) {
+		this.email = email;
+	}
+	public String getSsoId() {
+		return ssoId;
+	}
+	public void setSsoId(String ssoId) {
+		this.ssoId = ssoId;
+	}
+	public String getUserStatus() {
+		return userStatus;
+	}
+	public void setUserStatus(String userStatus) {
+		this.userStatus = userStatus;
+	}
+	
+	public UserSso() {}
+	public UserSso(Long id, String ssoId, String username){
+		super();
+		this.userId = id;
+		this.ssoId = ssoId;
+		this.userName = username;
+	}
+}

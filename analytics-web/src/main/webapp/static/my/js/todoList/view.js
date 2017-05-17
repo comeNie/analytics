@@ -1,0 +1,416 @@
+define(function(require, exports, module) {
+	var model = require("./model");
+	var view = Backbone.View.extend({
+		el: "div.ajax-content",
+		events: {
+//			"change #logname_r": "initOrg",
+			"click #btn-r": "loginAccount",
+			"click button[for=closeIframe]": "closeIframe",
+			"click #curStageName": "openCurrentAssigneerName",
+			"click button[role='deleteTodo']": "deleteBtnLive"
+		},
+		initialize: function() { /** 初始化 */
+			this.model = new model();
+			this.render();
+		},
+		render: function() {
+//			this.initLogname();
+			this.initDatePickers();	//初始化日期控件
+			this.initTodoTable();	//初始化待办列表
+			this.initTodoSearch();	//初始化待办查询
+			this.initDoneSearch();	//初始化已办查询
+			this.initDoneTable();	//初始化已办列表
+			this.viewBtnLive();
+			this.editBtnLive();
+//			this.doneBtnLive();//下一流程接收人 @add by wangxy 20150908
+//			this.init();
+		},
+		initDatePickers: function(operate){
+			$(".date-picker").datepicker({
+				format: 'yyyy-mm-dd',
+				language: 'cn',
+				weekStart: 1,
+			});
+		},
+		initTodoSearch: function(){
+			var viewSelf = this;
+			$(document).on("click","#todo_search",function(){
+				viewSelf.todoTable.fnPageChange(0);
+			});
+			$(document).on("click","#todo_search_conditions .lbl",function(e){
+				$(this).closest(".lbl-group").find(".lbl").addClass("lbluncheck").removeClass("lblchecked");
+				$(this).removeClass("lbluncheck").addClass("lblchecked").parent().find("input[type='radio']")[0].click();
+				viewSelf.todoTable.fnPageChange(0);
+			});
+		},
+		initTodoTable:function(){
+			var viewSelf = this;
+			var todoTable = $("#tbl_todo").dataTable({
+				searching: false,
+				ordering: false,
+				bAutoWidth: false,
+				bRetrieve: true,
+				ajax: {
+					type: "POST",
+					url: $$ctx + "/todoList/findTodoListByCondition",
+					data: function(d) {
+						d.taskSubject = $("#taskSubject_todo").val();
+						d.taskCreatorName = $("#taskCreatorName_todo").val();
+						d.taskCreateDateStart = $("#taskCreateDateStart_todo").val();
+						d.taskCreateDateEnd = $("#taskCreateDateEnd_todo").val();
+						d.workflowCode = $("input[name='workflowCode_todo']:checked").val();
+					}
+				},
+				columns: [
+			        {data: "taskSubject", render: function(data, type, row) {//任务主题
+			        	var parm = "";
+			        	var sysCode = row.workflowCode;
+			        	var permissionAccount = row.taskAssigneer;
+			        	var logorgid = row.orgId;
+			        	var workflowid = row.workflowId;
+			        	var workflowcode = row.workflowCode;
+			        	var wftaskid = row.wfTaskId;
+			        	var nodeid = row.nodeId;
+			        	var taskstatus = row.taskStatus;
+			        	if (sysCode == 'riskmng' || sysCode == 'bxloan') {
+			        		parm ="&logname="+permissionAccount+"&logorgid="+logorgid;
+			        	}
+			        	var url ="unified/todoDeal?workflowid="+workflowid+"&workflowcode="+workflowcode+"&wftaskid="+wftaskid+"&nodeid="+nodeid+"&taskstatus="+taskstatus+parm;
+			        	var linkToTodo = "<a target='view_window' href='" + url + "'>" + data + "</a>";
+			        	return linkToTodo;
+			        }},
+			        {data: "workflowName"},//流程类型
+			        {data: "stageName"},//所处环节
+			        {data: "taskCreatorName"},//分配人
+			        {data: "taskCreateTime"},//分配时间
+			        {data: null,render: function(data, type, row){
+			        	var div = $("<div class='btn-group'></div>");
+			        	var button1 = $("<button data-workflowcode='" + row.workflowCode + "' " +
+							"data-workflowid='" + row.workflowId + "' " + 
+							"data-wftaskid='" + row.wfTaskId + "' " + 
+							"data-nodeid='" + row.nodeId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+							"data-taskassigneer='" + row.taskAssigneer + "' " + 
+							"data-logorgid='" + row.orgId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+							"class='btn btn-xs btn-info' role='showTaskTodo'><i class='ace-icon fa fa-edit'></i></button>");
+			        	var button2 = $("<button data-workflowcode='" + row.workflowCode + "' " +
+		        			"data-workflowid='" + row.workflowId + "' " + 
+		        			"data-taskid='" + row.taskId + "'" +
+		        			"data-tasksubject='" + row.taskSubject + "'" +
+							"data-wftaskid='" + row.wfTaskId + "' " + 
+							"data-nodeid='" + row.nodeId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+							"data-taskassigneer='" + row.taskAssigneer + "' " + 
+							"data-logorgid='" + row.orgId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+			        		"class='btn btn-xs btn-info' role='deleteTodo'><i class='ace-icon fa fa-minus'></i></button>");
+			        	var button3 = $("<button data-workflowcode='" + row.workflowCode + "' " +
+		        			"data-workflowid='" + row.workflowId + "' " + 
+							"data-wftaskid='" + row.wfTaskId + "' " + 
+							"data-nodeid='" + row.nodeId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+							"data-taskassigneer='" + row.taskAssigneer + "' " + 
+							"data-logorgid='" + row.orgId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+			        		"class='btn btn-xs btn-info' role='deleteTodo' disabled='disabled'><i class='ace-icon fa fa-minus'></i></button>");
+			        	var button = div.append(button1);
+			        	row.nodeId == "100510" ? button.append(button2) : button.append(button3);
+			        	return button[0].outerHTML;
+			        }}
+			    ]
+			});
+			viewSelf.todoTable = todoTable;
+		},
+		//TODO
+		deleteBtnLive: function(e){
+			var viewSelf = this;
+			var $btn = $(e.currentTarget);
+			bootbox.confirm("确认要撤销该任务吗？",function(flag){
+				if(flag==true){
+					$.ajax({
+						type:'POST',
+						url:$$ctx + "/todoList/deleteTodo",
+						data:{
+							workflowCode : $btn.data("workflowcode"),
+							workflowId : $btn.data("workflowid"),
+							taskId : $btn.data("wftaskid"),
+							nodeId : $btn.data("nodeid"),
+							taskSubject : $btn.data("tasksubject"),
+							orgId : $btn.data("logorgid")
+						},
+						success:function(result){
+							viewSelf.todoTable.fnPageChange(0);
+							bootbox.alert("<span style='font-size:16px;'>撤销成功.</span>");
+						}
+					});
+				}
+			});
+		},
+		editBtnLive: function(){
+			var viewSelf = this;
+			$("#tbl_todo").on("click", "button[role='showTaskTodo']",function(e){
+				var self = $(this);
+				var permissionAccount = self.data("taskassigneer");
+				var logorgid = self.data("logorgid");
+				var workflowid = self.data("workflowid");
+				var workflowcode = self.data("workflowcode");
+				var wftaskid = self.data("wftaskid");
+				var nodeid = self.data("nodeid");
+				var taskstatus = self.data("taskstatus");
+				var sysCode = viewSelf.sysPath(workflowcode);
+				
+				var parm = "";
+				if (sysCode == 'riskmng' || sysCode == 'bxloan') parm = "&logname=" + permissionAccount + "&logorgid="+logorgid;
+			//	var path = $$ipPort + viewSelf.sysPath(workflowcode);
+				var url ="unified/todoDeal?workflowid=" + workflowid + "&workflowcode=" + workflowcode + "&wftaskid=" + wftaskid + "&nodeid=" + nodeid + "&taskstatus=" + taskstatus + parm;
+				var newWindow = window.open(url);
+				winArr.push(newWindow);
+				/*$("#todoTask-win div.modal-header h4").html("<div class='page-header'><h1>集中审批<small><i class='ace-icon fa fa-angle-double-right'></i>" + viewSelf.workflowType(workflowcode) + "审批" + "</small></h1></div>");
+				$("#todo-iframe").attr("src", url);
+				$("#todoTask-win").modal('show');
+				
+				$("#todo-iframe").load(function(){
+					var clientHeight = window.screen.height;
+					$("#todo-iframe").attr("height", clientHeight-280 + "px");
+				});*/
+			});
+		},
+		
+		initDoneSearch: function(){
+			var viewSelf = this;
+			$(document).on("click","#done_search",function(){
+				viewSelf.doneTable.fnPageChange(0);
+			});
+			$(document).on("click","#done_search_conditions .lbl",function(e){
+				$(this).closest(".lbl-group").find(".lbl").addClass("lbluncheck").removeClass("lblchecked");
+				$(this).removeClass("lbluncheck").addClass("lblchecked").parent().find("input[type='radio']")[0].click();
+				viewSelf.doneTable.fnPageChange(0);
+			});
+		},
+		initDoneTable: function(){
+			var viewSelf = this;
+			var doneTable = $("#tbl_done").dataTable({
+				searching: false,
+				ordering: false,
+				bAutoWidth: false,
+				bRetrieve: true,
+				ajax: {
+					type: "POST",
+					url: $$ctx + "/todoList/findDoneListByCondition",
+					data: function(d) {
+						d.taskSubject = $("#taskSubject_done").val();
+						d.taskAssignDateStart = $("#taskAssignDateStart_done").val();
+						d.taskAssignDateEnd = $("#taskAssignDateEnd_done").val();
+						d.taskCreatorName = $("#taskCreatorName_done").val();
+						d.workflowCode = $("input[name='workflowCode_done']:checked").val();
+						d.taskConfirmDateStart = $("#taskConfirmDateStart_done").val();
+						d.taskConfirmDateEnd = $("#taskConfirmDateEnd_done").val();
+					}
+				},
+				columns: [
+			        {data: "taskSubject"},//任务主题
+			        {data: "workflowName"},//流程类型
+			        {data: "stageName"},//所处环节
+			        {data: "currentName",render: function(data, type, row){
+			        	var linkToDone = "<a id='curStageName' style='cursor:pointer;' data-workflowid='"+ row.workflowId +"' >" + data + "</a>";
+			        	return linkToDone;
+			        	
+			        }},//当前环节
+//			        {data: "taskCreatorName"},//分配人
+			        {data: "taskCreateTime"},//分配时间
+			        {data: "taskConfirmTime"},//处理时间
+			        {data: null, render: function(data, type, row) {
+			        	var operation = 
+						"<div class='btn-group'>"+
+							"<button data-workflowcode='" + row.workflowCode + "' " +
+							"data-workflowid='" + row.workflowId + "' " + 
+							"data-wftaskid='" + row.wfTaskId + "' " + 
+							"data-nodeid='" + row.nodeId + "' " + 
+							"data-taskstatus='" + row.taskStatus + "' " + 
+							"data-taskassigneer='" + row.taskAssigneer + "' " + 
+							"data-logorgid='" + row.orgId + "' " + 
+							"class='btn btn-xs btn-info' role='showTaskDone'><i class='ace-icon fa fa-eye'></i></button>" + 
+						"</div>";
+			    	    return operation;
+	                }}
+			    ]
+			});
+			viewSelf.doneTable = doneTable;
+		},
+		openCurrentAssigneerName: function(e){
+			var viewSelf = this;
+			var $btn=$(e.currentTarget);//获得当前操作按钮
+			var curAssignName = "";
+        	$.ajax({
+        		type:"POST",
+        		url:$$ctx + "/todoList/findCurrentTaskAssignee",
+        		async:false,//注意，此处使用同步加载@add by wangxy
+        		data:{
+        			orgId:$("#orgId").val(),
+        			workflowId:$btn.data("workflowid")
+        		},
+        		success:function(result){
+        			curAssignName = result.data.data[0].currentAssigneerName;
+        		}
+        	});
+			bootbox.alert("<h4 class='blue bigger'>目前环节处理人</h4><hr/>"+curAssignName);
+		},
+		viewBtnLive: function(){
+			var viewSelf = this;
+			$("#tbl_done").on("click", "button[role='showTaskDone']",function(e){
+				var self = $(this);	
+				var permissionAccount = self.data("taskassigneer");
+				var logorgid = self.data("logorgid");
+				var workflowid = self.data("workflowid");
+				var workflowcode = self.data("workflowcode");
+				var nodeId = self.data("nodeid");
+				
+				//var path = viewSelf.sysPath(workflowcode);
+				var sysCode = viewSelf.sysPath(workflowcode);
+				var parm = "";
+				if (sysCode == 'riskmng' || sysCode == 'bxloan') parm = "&logname=" + permissionAccount + "&logorgid="+logorgid;
+				var url = "unified/doneDeal" + "?workflowcode=" + workflowcode + "&workflowid=" + workflowid + "&nodeId=" + nodeId + parm;
+				var newWindow = window.open(url);
+				winArr.push(newWindow);
+				/*$("#doneTask-win div.modal-header h4").html("<div class='page-header'><h1>集中审批<small><i class='ace-icon fa fa-angle-double-right'></i>" + viewSelf.workflowType(workflowcode) + "查看" + "</small></h1></div>");
+				$("#done-iframe").attr("src", url);
+				$("#doneTask-win").modal('show');
+				$("#done-iframe").load(function(){
+					var clientHeight = window.screen.height;
+					$("#done-iframe").attr("height", clientHeight-310 + "px");
+				});*/
+			});
+		},
+//		initLogname: function() {
+//			var viewSelf = this;
+//			viewSelf.model.isRegist(function(isRe){
+//				//是否登记账号
+//				if (isRe.success) {
+//					$("#account-login-prompt").modal("show");
+//					viewSelf.model.isMultiple(function(rm){
+//						if (rm.success) {//弹出账号选择框
+//							$.each(rm.data,function(i,item){
+//								$("<option value='"+item.logname+"'>"+ item.logname+"</option>").appendTo("#logname_r");
+//							});
+//							viewSelf.oData = rm.data;
+//							viewSelf.initOrg();
+//							viewSelf.loginAccount();
+//						} else {//不弹出账号选择框  直接默认提交
+//							if (rm.data == null) {
+//								viewSelf.model.getPersons(function(r){
+//									$("#account-login-prompt").modal("hide");
+//									if (r.data != null) {
+//										//$('body').addClass('ain-content login-layout light-login');
+//										//判断要不要显示账号选择框 (20150316 修改):如果是一个账号以及一个机构 那么不弹出，否则弹出（多个账号或者多个机构）
+//										$("#account-login").modal("show");
+//										$.each(r.data,function(i,item){
+//											$("<option value='"+item.logname+"'>"+ item.logname+"</option>").appendTo("#logname_r");
+//										});
+//										viewSelf.oData = r.data;
+//										viewSelf.initOrg();
+//									}
+//								});
+//							} else {
+//								$("<option value='"+rm.data.loginName+"'>"+ rm.data.loginName +"</option>").appendTo("#logname_r");
+//								$("<option value='"+rm.data.orgId+"'>"+ rm.data.orgName + "</option>").appendTo("#orgid_r");
+//								viewSelf.loginAccount();
+//							}
+//						}
+//					});
+//				} else {
+//					viewSelf.init();
+//				}
+//			});
+//		},
+//		initOrg: function(){
+//			var viewSelf = this;
+//			$("#orgid_r").empty();
+//			var lognameIndex = $("#logname_r")[0].selectedIndex;
+//			$.each(viewSelf.oData[lognameIndex].orgList,function(i,item){
+//				$("<option value='"+item.id+"'>"+ item.name + "</option>").appendTo("#orgid_r");
+//			});
+//		},
+//		loginAccount: function() {
+//			var viewSelf = this;
+//			viewSelf.model.registration($("#loginAcc-form"), function(r){
+//				if (r.success) {
+//					$("#account-login").modal("hide");
+//					$("#account-login-prompt").modal("hide");
+//					//$("#tbl_todo").dataTable().fnDestroy();
+//					//$("#tbl_done").dataTable().fnDestroy();
+//					viewSelf.init();
+//				}
+//			});
+//		},
+		sysPath: function(workflowcode) {
+			var rootPath = "analytics";
+			switch (workflowcode) {
+				case 1001:
+					rootPath = "riskmng";
+					break;
+				case 1002:
+					rootPath = "riskmng";
+					break;
+				case 1003:
+					rootPath = "bxloan";
+					break;
+				case 1004:
+					rootPath = "bxloan";
+					break;
+				case 1005:
+					rootPath = "analytics";
+					break;
+				case 1006:
+					rootPath = "analytics";
+					break;
+			}
+			return rootPath;
+		},
+		workflowType: function(workflowcode) {
+			var name = "规则配置";
+			switch (workflowcode) {
+				case 1001:
+					rootPath = "规则配置";
+					break;
+				case 1002:
+					rootPath = "决策";
+					break;
+				case 1003:
+					rootPath = "易贷";
+					break;
+				case 1004:
+					rootPath = "微贷";
+					break;
+				case 1005:
+					rootPath = "模板";
+					break;
+				case 1006:
+					rootPath = "报表上报";
+					break;
+			}
+			return rootPath;
+		},
+		closeIframe: function(){
+			$("#todoTask-win").modal('hide');
+			$("#doneTask-win").modal('hide');
+			$("#tbl_todo").dataTable().fnPageChange(0);
+			$("#tbl_done").dataTable().fnPageChange(0);
+		}
+	});
+	module.exports = view;
+});
+function winOperate(widState) {
+	$("#todoTask-win").modal('hide');
+	$("#doneTask-win").modal('hide');
+	$("#tbl_todo").dataTable().fnPageChange(0);
+	$("#tbl_done").dataTable().fnPageChange(0);
+}
+function fatherDailog(msg) {
+	bootbox.alert(msg);
+}
+function fatherDailogBussiness(msg) {
+	bootbox.alert(msg, function() {
+        window.parent.denyAudit();
+    });
+}

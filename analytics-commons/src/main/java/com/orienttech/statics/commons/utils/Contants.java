@@ -1,0 +1,76 @@
+package com.orienttech.statics.commons.utils;
+
+
+public class Contants {
+	//public final static String PORTAL_URL="portal.url";
+//	public final static String TJ_SCHEMA="cognos_data";//本地、243测试库（20160408后，本地与生产保持一致，都用cog_data）
+    public final static String TJ_SCHEMA="cog_data";//生产库、38测试库
+	
+	public final static String XD_TEMPLET = "allXD";
+	public final static String ALL_TEMPLET = "allOrg";
+	public final static String SIG_TEMPLET = "singleOrg";
+	
+	//报表周期
+	
+	/**一次性填报*/
+	public final static int CYCLE_ONCE = 1;//一次性填报
+	/**年报*/
+	public final static int CYCLE_YEAR = 2;//年报
+	/**半年报*/
+	public final static int CYCLE_HALF_YEAR = 3;//半年报
+	/**季报*/
+	public final static int CYCLE_SEASON = 4;//季报
+	/**月报*/
+	public final static int CYCLE_MONTH = 5;//月报
+	/**旬报*/
+	public final static int CYCLE_TEN_DAY = 6;//旬报
+	/**周报*/
+	public final static int CYCLE_WEEK = 7;//周报
+	
+	
+	
+	//汇总方式
+	 
+	/**按行汇总*/
+	public final static int SUMTYPE_ROW = 1;//按行汇总
+	/**按页汇总*/
+	public final static int SUMTYPE_PAGE = 2;//按页汇总
+	
+	//模版状态
+	
+	/**未提交*/
+	public final static String STATE_UNCOMMITTED = "1";//未提交
+	/**未提交*/
+	public final static String STATE_SENDBACK_UNCOMMITTED = "10";//退回后暂存，显示为未提交
+	/**部门审核*/
+	public final static String STATE_DEP_CHECK = "2";//部门审核
+	/**统计组审核*/
+	public final static String STATE_GROUP_CHECK = "3";//统计组审核
+	/**负责人审核*/
+	public final static String STATE_CHARGE_CHECK = "4";//负责人审核
+	/**已发布*/
+	public final static String STATE_RELEASE = "5";//已发布   //改成：报表收集  By dz
+	/**模板发布*/
+	public final static String STATE_TEMPLATE_RELEASE = "9";//模板发布
+	/**已失效*/
+	public final static String STATE_FAILUE = "6";//已失效
+	/**暂停执行*/
+	public final static String STATE_EXCUTE_STOP= "7";//暂停执行
+	/**已退回*/
+	public final static String STATE_SENDBACK = "8";//已退回
+	
+	//汇总方式
+	
+	/**未汇总*/
+	public final static String STATE_UNSUM = "0";//未汇总
+	/**已汇总*/
+	public final static String STATE_SUMED = "1";//已汇总
+	                                    // = "2";//已发布
+	//报表状态
+	
+	/**未报送*/
+	public static final String UNREPORT = "0";//未报送
+	/**已报送*/
+	public static final String REPORTED = "1";//已报送
+	//                                  = "3";//已退回
+}

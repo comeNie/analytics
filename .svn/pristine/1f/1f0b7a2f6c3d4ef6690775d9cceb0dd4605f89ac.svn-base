@@ -1,0 +1,91 @@
+package com.orienttech.statics.web.security;
+
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authc.AuthenticationException;
+import org.apache.shiro.authc.AuthenticationInfo;
+import org.apache.shiro.authc.AuthenticationToken;
+import org.apache.shiro.authc.SimpleAuthenticationInfo;
+import org.apache.shiro.authc.UnknownAccountException;
+import org.apache.shiro.authz.AuthorizationInfo;
+import org.apache.shiro.cas.CasRealm;
+import org.apache.shiro.subject.PrincipalCollection;
+import org.apache.shiro.subject.SimplePrincipalCollection;
+import org.apache.shiro.util.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+
+import com.orienttech.statics.commons.security.SessionUser;
+import com.orienttech.statics.service.model.usermng.UserBo;
+import com.orienttech.statics.service.usermng.OrgDeptService;
+import com.orienttech.statics.service.usermng.UserMngService;
+
+public class MyCasRealm extends CasRealm {
+
+	private static final Logger logger = LoggerFactory.getLogger(MyCasRealm.class);
+
+	private UserMngService userMngService;
+//	private OrgDeptService orgDeptService;
+
+	/**
+	 * 认证
+	 */
+	@SuppressWarnings("unchecked")
+	@Override
+	protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
+		SimpleAuthenticationInfo info = (SimpleAuthenticationInfo) super.doGetAuthenticationInfo(token);
+		PrincipalCollection principalCollection = info.getPrincipals();
+		List<Object> listPrincipals = principalCollection.asList();
+		
+		String ssoId = (String) listPrincipals.get(0);
+		logger.info("cas-username:" + ssoId);
+		
+		Map<String, String> attributes = (Map<String, String>) listPrincipals.get(1);
+        
+        UserBo user = userMngService.findUserBySsoId(ssoId);
+        if(user==null){
+        	throw new UnknownAccountException();
+        }
+        /**
+		 * 处理其他机构
+		 */
+//		String otherOrgName = "";
+//		String otherOrgCodes = user.getOtherOrgCode();
+//		if(otherOrgCodes != null){
+//			String[] otherOrgs = otherOrgCodes.split(",");
+//			for(String orgCode : otherOrgs){
+//				String orgName = orgDeptService.findOrgNameByOrgId(orgCode);
+//				otherOrgName = orgName + ",";
+//			}
+//			otherOrgName = otherOrgName.substring(0, otherOrgName.length()-1);
+//		}
+        
+        SessionUser shiroUser = new SessionUser();
+		BeanUtils.copyProperties(user, shiroUser);
+//		shiroUser.setOtherOrgName(otherOrgName);
+		
+		//10001表示总部
+		String premLevel=StringUtils.equalsIgnoreCase("10001", user.getOrgCode())?"1":"2";
+		shiroUser.setPremLevel(premLevel);
+        List<Object> shiroPrincipals = CollectionUtils.asList(shiroUser, attributes);
+        principalCollection = new SimplePrincipalCollection(shiroPrincipals, getName());
+        info.setPrincipals(principalCollection);
+        return info;
+	}
+	
+	/**
+	 * 鉴权
+	 */
+	@Override
+	protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principals) {
+		return super.doGetAuthorizationInfo(principals);
+	}
+
+	public void setUserMngService(UserMngService userMngService) {
+		this.userMngService = userMngService;
+	}
+
+}
